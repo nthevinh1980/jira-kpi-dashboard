@@ -1,32 +1,16 @@
-
 from __future__ import annotations
 
-import html
+import json
 import os
 import re
+import unicodedata
 from datetime import datetime
 from typing import Any
 
-import numpy as np
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
 import streamlit as st
+import streamlit.components.v1 as components
 
 from jira_client import JiraApiError, JiraClient
-
-
-APP_VERSION = "6.0"
-DEFAULT_JQL = 'project = "BANCORE" AND parentEpic IN (BANCORE-7559) AND issuetype = Task ORDER BY duedate ASC'
-DONE_DEFAULT = "Done, Closed, Resolved"
-COMPLEXITY_WEIGHT = {
-    "Very Complex": 5,
-    "Complex": 4,
-    "Medium": 3,
-    "Simple": 2,
-    "Very Simple": 1,
-    "Không phân loại": 1,
-}
 
 st.set_page_config(
     page_title="Jira BSC Executive Dashboard",
@@ -35,66 +19,19 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# ---------------------------------------------------------------------
-# STYLE
-# ---------------------------------------------------------------------
 st.markdown("""
 <style>
-:root{
-  --navy:#0b1f33; --navy2:#123f64; --blue:#177ddc; --cyan:#11a7b8;
-  --green:#13966a; --amber:#d98b17; --red:#d94b57; --violet:#7257b5;
-  --bg:#f4f7fb; --card:#fff; --line:#e5edf4; --text:#173249; --muted:#7b91a4;
-}
-html,body,[data-testid="stAppViewContainer"]{background:#f4f7fb}
-[data-testid="stHeader"]{background:transparent}
-.block-container{max-width:1600px;padding-top:1rem;padding-bottom:2rem}
-.bsc-hero{
-  background:linear-gradient(118deg,#071c31 0%,#0d3d61 43%,#0a7897 76%,#17a184 100%);
-  color:white;border-radius:24px;padding:22px 24px;box-shadow:0 18px 50px rgba(11,31,51,.18);
-  position:relative;overflow:hidden;margin-bottom:14px;
-}
-.bsc-hero:after{content:"";position:absolute;width:360px;height:360px;border-radius:50%;background:rgba(255,255,255,.07);right:-100px;top:-180px}
-.bsc-hero-title{font-size:29px;font-weight:900;letter-spacing:-.03em;position:relative;z-index:1}
-.bsc-hero-sub{font-size:13px;color:#d8eef5;margin-top:7px;position:relative;z-index:1}
-.bsc-live{display:inline-flex;align-items:center;gap:8px;margin-top:13px;padding:7px 10px;border:1px solid rgba(255,255,255,.20);background:rgba(255,255,255,.10);border-radius:999px;font-size:11px;font-weight:750;position:relative;z-index:1}
-.bsc-dot{width:8px;height:8px;background:#67f0ad;border-radius:50%;box-shadow:0 0 0 5px rgba(103,240,173,.14)}
-.bsc-period{display:inline-block;background:white;color:#0a5673;padding:7px 11px;border-radius:999px;font-size:11px;font-weight:900;margin-left:7px}
-.kpi-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:14px 0}
-.kpi-card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:14px;box-shadow:0 7px 24px rgba(20,54,83,.05);min-width:0}
-.kpi-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.kpi-label{font-size:11px;font-weight:800;color:#71869a}
-.kpi-icon{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;background:var(--soft);color:var(--c)}
-.kpi-icon svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9}
-.kpi-value{font-size:29px;font-weight:950;letter-spacing:-.04em;color:var(--c);margin-top:8px}
-.kpi-meta{font-size:10px;color:#8a9bab;margin-top:6px}
-.delta{display:inline-block;padding:3px 6px;border-radius:999px;font-weight:850;margin-right:4px}
-.delta-up{background:#e8f8ef;color:#15804e}.delta-down{background:#ffecee;color:#c13f4c}.delta-neutral{background:#edf4fb;color:#316b9d}
-.c-blue{--c:#177ddc;--soft:#eaf4ff}.c-green{--c:#13966a;--soft:#e9f8ef}.c-teal{--c:#0e8fa1;--soft:#e7f7f8}
-.c-amber{--c:#d98b17;--soft:#fff4e4}.c-red{--c:#d94b57;--soft:#ffedef}.c-violet{--c:#7257b5;--soft:#f1ecfb}
-.c-navy{--c:#285778;--soft:#eaf0f6}.c-cyan{--c:#158ab8;--soft:#e9f7fc}.c-gold{--c:#a97812;--soft:#fff7df}
-.exec-summary{background:white;border:1px solid var(--line);border-radius:18px;padding:14px;display:grid;grid-template-columns:1.35fr repeat(4,1fr);gap:10px;box-shadow:0 7px 22px rgba(22,48,75,.04);margin-bottom:14px}
-.exec-intro{padding:3px 7px}.exec-intro b{font-size:14px}.exec-intro p{margin:5px 0 0;font-size:10px;line-height:1.45;color:var(--muted)}
-.exec-target{border-left:1px solid #e8eef3;padding-left:12px}.exec-target span{font-size:9px;color:#7f93a5}.exec-target strong{display:block;font-size:20px;margin-top:4px}.exec-target small{font-size:9px;font-weight:800}
-.t-good{color:#13966a}.t-warn{color:#d98b17}.t-bad{color:#d94b57}
-.section-title{font-size:17px;font-weight:900;color:#17354c;margin:8px 0 2px}.section-sub{font-size:11px;color:#879aaa;margin-bottom:10px}
-[data-testid="stDataFrame"]{background:white;border:1px solid #e6edf3;border-radius:16px;padding:5px;box-shadow:0 7px 24px rgba(19,48,75,.04)}
-div[data-testid="stPlotlyChart"]{background:white;border:1px solid #e6edf3;border-radius:18px;padding:8px;box-shadow:0 7px 24px rgba(19,48,75,.04)}
-div[data-testid="stExpander"]{background:white;border-radius:14px;border:1px solid #e6edf3}
-[data-testid="stSidebar"]{background:#f8fbfd}
-.stButton>button,.stDownloadButton>button{border-radius:10px;font-weight:800}
-.attention{border-radius:14px;padding:12px 13px;border:1px solid #e9eef3;background:white;margin:6px 0}
-.attention.red{border-left:4px solid #d94b57}.attention.amber{border-left:4px solid #d98b17}.attention.blue{border-left:4px solid #177ddc}
-.attention b{font-size:12px}.attention p{font-size:10px;color:#7b91a4;margin:4px 0 0}
-@media(max-width:1200px){.kpi-grid{grid-template-columns:repeat(3,1fr)}.exec-summary{grid-template-columns:1fr 1fr 1fr}.exec-intro{grid-column:1/-1}}
-@media(max-width:700px){.kpi-grid{grid-template-columns:1fr 1fr}.exec-summary{grid-template-columns:1fr 1fr}}
-@media(max-width:450px){.kpi-grid,.exec-summary{grid-template-columns:1fr}.bsc-hero-title{font-size:23px}}
+html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"] { background:#f4f7fb !important; }
+[data-testid="stHeader"], [data-testid="stToolbar"], footer { visibility:hidden !important; height:0 !important; }
+.block-container { max-width:none !important; padding:0 !important; margin:0 !important; }
+iframe { border:0 !important; }
 </style>
 """, unsafe_allow_html=True)
 
+DEFAULT_JQL = 'project = "BANCORE" AND parentEpic IN (BANCORE-7559) AND issuetype = Task ORDER BY duedate ASC'
+PREVIEW_HTML = '<!DOCTYPE html>\n<html lang="vi">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>Jira BSC Executive Dashboard - Demo</title>\n<style>\n:root{\n  --navy:#0b1f33; --navy2:#123f64; --blue:#177ddc; --cyan:#11a7b8;\n  --green:#13966a; --amber:#d98b17; --red:#d94b57; --violet:#7257b5;\n  --bg:#f4f7fb; --card:#fff; --line:#e5edf4; --text:#173249; --muted:#7b91a4;\n}\n*{box-sizing:border-box}\nbody{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text)}\n.app{max-width:1600px;margin:auto;padding:20px}\n.hero{\n  background:linear-gradient(118deg,#071c31 0%,#0d3d61 43%,#0a7897 76%,#17a184 100%);\n  color:#fff;border-radius:24px;padding:22px 24px;box-shadow:0 18px 50px rgba(11,31,51,.20);\n  position:relative;overflow:hidden\n}\n.hero:after{content:"";position:absolute;width:360px;height:360px;border-radius:50%;background:rgba(255,255,255,.07);right:-100px;top:-180px}\n.hero-top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;position:relative;z-index:1}\n.title{font-size:29px;font-weight:900;letter-spacing:-.03em}.subtitle{font-size:13px;color:#d8eef5;margin-top:7px}\n.api{display:flex;align-items:center;gap:8px;padding:9px 12px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.10);border-radius:13px;font-size:12px;font-weight:700}\n.live-dot{width:8px;height:8px;background:#67f0ad;border-radius:50%;box-shadow:0 0 0 5px rgba(103,240,173,.14)}\n.filters{display:grid;grid-template-columns:1fr 1fr 1.45fr 1.3fr;gap:10px;margin-top:18px;position:relative;z-index:1}\n.filter{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.19);padding:8px 11px;border-radius:13px}\n.filter label{font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#cce8ef;display:block}\n.filter select{width:100%;height:31px;color:white;background:transparent;border:0;outline:none;font-weight:800;font-size:13px}\n.filter option{color:#173249;background:white}\n.hero-tags{display:flex;flex-wrap:wrap;gap:7px;margin-top:13px;position:relative;z-index:1}\n.hero-tag{padding:6px 9px;border-radius:999px;border:1px solid rgba(255,255,255,.17);background:rgba(255,255,255,.10);font-size:10px;font-weight:800}\n.hero-tag.strong{background:#fff;color:#0a5673}\n\n.metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-top:14px}\n.metric{background:#fff;border:1px solid var(--line);border-radius:18px;padding:14px;box-shadow:0 7px 24px rgba(20,54,83,.05);min-width:0}\n.metric-head{display:flex;justify-content:space-between;align-items:center;gap:8px}\n.metric-label{font-size:10px;font-weight:800;color:#71869a}\n.icon{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;background:var(--soft);color:var(--c)}\n.icon svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9}\n.metric-value{font-size:30px;font-weight:950;letter-spacing:-.04em;color:var(--c);margin-top:8px}\n.metric-meta{font-size:9px;color:#8a9bab;margin-top:6px}\n.delta{display:inline-block;padding:3px 6px;border-radius:999px;font-weight:850;margin-right:4px}\n.up{background:#e8f8ef;color:#15804e}.down{background:#ffecee;color:#c13f4c}.neutral{background:#edf4fb;color:#316b9d}\n.c-blue{--c:#177ddc;--soft:#eaf4ff}.c-green{--c:#13966a;--soft:#e9f8ef}.c-teal{--c:#0e8fa1;--soft:#e7f7f8}\n.c-amber{--c:#d98b17;--soft:#fff4e4}.c-red{--c:#d94b57;--soft:#ffedef}.c-violet{--c:#7257b5;--soft:#f1ecfb}\n.c-navy{--c:#285778;--soft:#eaf0f6}.c-cyan{--c:#158ab8;--soft:#e9f7fc}.c-gold{--c:#a97812;--soft:#fff7df}\n\n.summary{margin-top:14px;background:#fff;border:1px solid var(--line);border-radius:18px;padding:14px;display:grid;grid-template-columns:1.35fr repeat(4,1fr);gap:10px}\n.summary-intro{padding:3px 7px}.summary-intro b{font-size:14px}.summary-intro p{margin:5px 0 0;font-size:10px;line-height:1.45;color:var(--muted)}\n.target{border-left:1px solid #e8eef3;padding-left:12px}.target span{font-size:9px;color:#7f93a5}.target strong{display:block;font-size:21px;margin-top:4px}.target small{font-size:9px;font-weight:800}\n.good{color:var(--green)}.warn{color:var(--amber)}.bad{color:var(--red)}\n\n.grid-main{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(330px,.8fr);gap:13px;margin-top:13px}\n.grid-3{display:grid;grid-template-columns:1.45fr 1fr 1fr;gap:13px;margin-top:13px}\n.card{background:#fff;border:1px solid var(--line);border-radius:19px;padding:16px;box-shadow:0 7px 24px rgba(19,48,75,.05);min-width:0}\n.card-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:12px}\n.card-title{font-size:14px;font-weight:900}.card-sub{font-size:9px;color:#879aaa;margin-top:3px}.tag{font-size:9px;font-weight:800;background:#eaf5fc;color:#2674ac;padding:5px 8px;border-radius:999px}\n\n.table-wrap{overflow:auto;border:1px solid #eaf0f5;border-radius:12px}\ntable{border-collapse:collapse;width:100%;min-width:980px;font-size:10px}\nth{background:#f7fafc;color:#6b8093;font-weight:850;padding:9px 7px;text-align:right;border-bottom:1px solid #e7edf2;white-space:nowrap}\ntd{padding:9px 7px;border-bottom:1px solid #eef3f6;text-align:right;color:#304c63}\nth:first-child,td:first-child{text-align:left}tbody tr:hover{background:#f8fbfd}\n.person{display:flex;align-items:center;gap:8px}.avatar{width:31px;height:31px;border-radius:10px;display:grid;place-items:center;color:white;font-weight:900;font-size:10px}\n.person b{display:block;font-size:10px}.person span{font-size:8px;color:#91a0ad}.n{font-size:12px;font-weight:900}\n.score{display:inline-block;padding:4px 7px;border-radius:999px;font-weight:900}.score.g{background:#e9f8ef;color:#137d4e}.score.m{background:#fff3e1;color:#b86a12}.score.r{background:#ffecef;color:#bd3f4b}\n\n.donut-row{display:flex;gap:17px;align-items:center;justify-content:center}.donut{width:155px;height:155px;border-radius:50%;background:conic-gradient(#16a568 0 58%,#e99b2d 58% 69%,#de4e59 69% 76%,#2f83d5 76% 91%,#8c65c8 91%);position:relative}\n.donut:after{content:"";position:absolute;inset:28px;background:#fff;border-radius:50%}.donut-txt{position:absolute;inset:0;display:grid;place-items:center;z-index:2;text-align:center}.donut-txt strong{font-size:27px}.donut-txt span{display:block;font-size:8px;color:#8ea0af}\n.legend{display:flex;flex-direction:column;gap:7px;min-width:135px}.leg{display:grid;grid-template-columns:9px 1fr auto;gap:6px;align-items:center;font-size:9px}.dot{width:8px;height:8px;border-radius:3px}.leg strong{font-size:11px}\n\n.bar-list{display:flex;flex-direction:column;gap:8px}.bar-row{display:grid;grid-template-columns:105px 1fr 35px;gap:7px;align-items:center;font-size:9px}\n.track{height:12px;background:#eef3f6;border-radius:999px;overflow:hidden}.fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#1685d4,#12a389)}.fill-risk{background:linear-gradient(90deg,#e5a131,#df4e59)}\n\n.trend{height:205px;display:grid;grid-template-columns:repeat(12,1fr);gap:5px;align-items:end;border-bottom:1px solid #dde7ee;padding:18px 2px 0}\n.mc{height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:3px}.mv{font-size:8px;font-weight:850;color:#587087}.mb{width:68%;min-width:8px;border-radius:6px 6px 2px 2px;background:linear-gradient(180deg,#149bd0,#1773ce)}.ml{font-size:8px;color:#91a1ae}\n.age{display:flex;align-items:flex-end;gap:9px;height:180px;padding-top:20px}.age-col{flex:1;text-align:center}.age-bar{border-radius:8px 8px 2px 2px;background:linear-gradient(180deg,#efaa39,#df5360)}.age-col b{font-size:10px}.age-col span{font-size:8px;color:#8295a5;display:block;margin-top:5px}\n.risks{display:flex;flex-direction:column;gap:8px}.risk{border:1px solid #edf1f4;border-radius:11px;padding:9px;display:flex;gap:8px}.risk-ico{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;flex:0 0 auto}.risk-ico svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2}.risk b{font-size:9px}.risk p{font-size:8px;color:#8396a6;line-height:1.4;margin:3px 0 0}\n.ri-red{background:#ffedf0;color:#cf4350}.ri-amber{background:#fff3df;color:#c87812}.ri-blue{background:#eaf4ff;color:#1974c4}\n\n.detail{margin-top:13px}.chips{display:flex;gap:6px;flex-wrap:wrap}.chip{border:1px solid #dce6ee;background:white;color:#647d91;padding:7px 10px;border-radius:999px;font-size:9px;font-weight:850;cursor:pointer}.chip.active{background:#173f63;color:#fff;border-color:#173f63}\n.task-table{min-width:1160px}.task-table th,.task-table td{text-align:left}.issue{color:#1475c3;font-weight:900}.status{padding:4px 6px;border-radius:999px;font-size:8px;font-weight:850}.s-done{background:#e9f8ef;color:#148052}.s-late{background:#fff3e2;color:#bc6d13}.s-over{background:#ffecef;color:#be3e49}.s-doing{background:#eaf4ff;color:#176eb6}\n.detail-panel{display:none;margin-top:10px;padding:11px;border-radius:12px;border:1px solid #dfeaf2;background:linear-gradient(110deg,#f7fbff,#f5fffb)}.detail-panel.show{display:block}.detail-panel b{font-size:10px}.detail-panel p{font-size:9px;color:#718799;line-height:1.5;margin:4px 0 0}\n.demo{font-size:9px;color:#8fa0ad;text-align:right;margin-top:8px}\n\n@media(max-width:1200px){.metrics{grid-template-columns:repeat(3,1fr)}.summary{grid-template-columns:1fr 1fr 1fr}.summary-intro{grid-column:1/-1}.grid-main,.grid-3{grid-template-columns:1fr}}\n@media(max-width:700px){.app{padding:11px}.hero-top{flex-direction:column}.filters{grid-template-columns:1fr 1fr}.metrics{grid-template-columns:1fr 1fr}.summary{grid-template-columns:1fr 1fr}.donut-row{flex-direction:column}}\n@media(max-width:450px){.filters,.metrics,.summary{grid-template-columns:1fr}.title{font-size:23px}}\n</style>\n<div class="app">\n<section class="hero">\n  <div class="hero-top">\n    <div><div class="title">BSC Executive Performance</div><div class="subtitle">Jira BANCORE · Epic 7559 · Báo cáo hiệu suất Tháng / Quý / Năm</div></div>\n    <div class="api"><span class="live-dot"></span> Jira API · Live data</div>\n  </div>\n  <div class="filters">\n    <div class="filter"><label>Kỳ báo cáo</label><select id="ptype"><option value="month">Tháng</option><option value="quarter">Quý</option><option value="year">Năm</option></select></div>\n    <div class="filter"><label>Chọn kỳ</label><select id="pvalue"><option>08/2026</option><option>07/2026</option><option>06/2026</option></select></div>\n    <div class="filter"><label>Cán bộ</label><select id="staff"><option>Tất cả cán bộ</option><option>Nguyễn Thị Hồng Hoa</option><option>Bùi Quang Long</option><option>Nguyễn Quốc Việt</option><option>Nguyễn Thị Thu Nga</option><option>Đỗ Huy Hoàng</option></select></div>\n    <div class="filter"><label>Căn cứ</label><select><option>Due date trong kỳ</option><option>Hoàn thành trong kỳ</option><option>Created trong kỳ</option></select></div>\n  </div>\n  <div class="hero-tags"><span class="hero-tag strong" id="plabel">BSC THÁNG 08/2026</span><span class="hero-tag">Hoàn thành ≥ 90%</span><span class="hero-tag">Đúng hạn ≥ 90%</span><span class="hero-tag">Quá hạn ≤ 5%</span><span class="hero-tag">Comment ≤ 7 ngày</span></div>\n</section>\n\n<section class="metrics">\n  <div class="metric c-blue"><div class="metric-head"><span class="metric-label">Tổng công việc</span><span class="icon"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span></div><div class="metric-value">126</div><div class="metric-meta"><span class="delta up">+12</span>so kỳ trước</div></div>\n  <div class="metric c-green"><div class="metric-head"><span class="metric-label">Đã hoàn thành</span><span class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16.5 8"/></svg></span></div><div class="metric-value">108</div><div class="metric-meta"><span class="delta up">85.7%</span>tổng Task</div></div>\n  <div class="metric c-teal"><div class="metric-head"><span class="metric-label">Đúng hạn</span><span class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span></div><div class="metric-value">94</div><div class="metric-meta"><span class="delta neutral">87.0%</span>số Done</div></div>\n  <div class="metric c-amber"><div class="metric-head"><span class="metric-label">Hoàn thành trễ</span><span class="icon"><svg viewBox="0 0 24 24"><path d="M5 18 18 5M10 5h8v8"/></svg></span></div><div class="metric-value">14</div><div class="metric-meta"><span class="delta down">11.1%</span>tổng Task</div></div>\n  <div class="metric c-red"><div class="metric-head"><span class="metric-label">Quá hạn chưa Done</span><span class="icon"><svg viewBox="0 0 24 24"><path d="M12 3 2.5 20h19L12 3Z"/><path d="M12 9v5M12 17h.01"/></svg></span></div><div class="metric-value">7</div><div class="metric-meta"><span class="delta down">5.6%</span>cần xử lý</div></div>\n  <div class="metric c-violet"><div class="metric-head"><span class="metric-label">Đang thực hiện</span><span class="icon"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 3-6"/><path d="M4 4v5h5"/></svg></span></div><div class="metric-value">11</div><div class="metric-meta"><span class="delta neutral">8.7%</span>tổng Task</div></div>\n  <div class="metric c-gold"><div class="metric-head"><span class="metric-label">Cập nhật muộn</span><span class="icon"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4V5Z"/><path d="M8 9h8M8 12h5"/></svg></span></div><div class="metric-value">9</div><div class="metric-meta"><span class="delta down">7.1%</span>comment &gt; 7 ngày</div></div>\n  <div class="metric c-cyan"><div class="metric-head"><span class="metric-label">Ngoài BSC</span><span class="icon"><svg viewBox="0 0 24 24"><path d="M4 6h7l2 3h7v9H4V6Z"/></svg></span></div><div class="metric-value">8</div><div class="metric-meta"><span class="delta neutral">6.3%</span>theo Labels</div></div>\n  <div class="metric c-navy"><div class="metric-head"><span class="metric-label">Workload điểm</span><span class="icon"><svg viewBox="0 0 24 24"><path d="M5 18V9M12 18V5M19 18v-7"/></svg></span></div><div class="metric-value">176</div><div class="metric-meta"><span class="delta up">+9.4%</span>theo Complexity</div></div>\n  <div class="metric c-green"><div class="metric-head"><span class="metric-label">BSC hiệu suất</span><span class="icon"><svg viewBox="0 0 24 24"><path d="m12 3 2.5 5 5.5.8-4 3.9.9 5.5-4.9-2.6-4.9 2.6.9-5.5-4-3.9 5.5-.8L12 3Z"/></svg></span></div><div class="metric-value">86.1%</div><div class="metric-meta"><span class="delta up">+2.3đ</span>so kỳ trước</div></div>\n</section>\n\n<section class="summary">\n  <div class="summary-intro"><b>Executive BSC Summary</b><p>Đánh giá nhanh mức đạt mục tiêu và các điểm cần can thiệp. Luôn hiển thị cả số lượng tuyệt đối lẫn tỷ lệ.</p></div>\n  <div class="target"><span>Hoàn thành / mục tiêu</span><strong class="warn">85.7% / 90%</strong><small class="bad">Thiếu 4.3 điểm %</small></div>\n  <div class="target"><span>Đúng hạn / mục tiêu</span><strong class="warn">87.0% / 90%</strong><small class="bad">Thiếu 3.0 điểm %</small></div>\n  <div class="target"><span>Quá hạn / ngưỡng</span><strong class="bad">5.6% / ≤5%</strong><small class="bad">Vượt 0.6 điểm %</small></div>\n  <div class="target"><span>BSC tổng hợp</span><strong class="good">86.1%</strong><small class="good">+2.3 điểm kỳ trước</small></div>\n</section>\n\n<section class="grid-main">\n  <div class="card">\n    <div class="card-head"><div><div class="card-title">Hiệu suất BSC theo cán bộ</div><div class="card-sub">Số lượng, tiến độ, đúng hạn, cập nhật và workload</div></div><span class="tag">7 cán bộ</span></div>\n    <div class="table-wrap">\n      <table>\n        <thead><tr><th>Cán bộ</th><th>Tổng</th><th>Done</th><th>Đúng hạn</th><th>HT trễ</th><th>Quá hạn</th><th>Đang làm</th><th>Update muộn</th><th>Workload</th><th>HT %</th><th>Đúng hạn %</th><th>BSC %</th></tr></thead>\n        <tbody id="staffRows">\n          <tr data-person="Nguyễn Thị Hồng Hoa"><td><div class="person"><div class="avatar" style="background:#247fc7">HH</div><div><b>Nguyễn Thị Hồng Hoa</b><span>Top performer</span></div></div></td><td class="n">14</td><td class="good n">14</td><td>13</td><td class="warn">1</td><td>0</td><td>0</td><td>0</td><td>24</td><td>100%</td><td>92.9%</td><td><span class="score g">97.9</span></td></tr>\n          <tr data-person="Bùi Quang Long"><td><div class="person"><div class="avatar" style="background:#159c87">BL</div><div><b>Bùi Quang Long</b><span>18 task</span></div></div></td><td class="n">18</td><td class="good n">16</td><td>14</td><td class="warn">2</td><td class="bad">1</td><td>1</td><td>1</td><td>29</td><td>88.9%</td><td>87.5%</td><td><span class="score g">88.5</span></td></tr>\n          <tr data-person="Nguyễn Quốc Việt"><td><div class="person"><div class="avatar" style="background:#6f59b5">QV</div><div><b>Nguyễn Quốc Việt</b><span>21 task</span></div></div></td><td class="n">21</td><td class="good n">18</td><td>16</td><td class="warn">2</td><td class="bad">1</td><td>2</td><td>2</td><td>31</td><td>85.7%</td><td>88.9%</td><td><span class="score g">86.7</span></td></tr>\n          <tr data-person="Nguyễn Thị Thu Nga"><td><div class="person"><div class="avatar" style="background:#d88b31">TN</div><div><b>Nguyễn Thị Thu Nga</b><span>17 task</span></div></div></td><td class="n">17</td><td>14</td><td>12</td><td class="warn">2</td><td class="bad">1</td><td>2</td><td>1</td><td>23</td><td>82.4%</td><td>85.7%</td><td><span class="score m">83.4</span></td></tr>\n          <tr data-person="Đỗ Huy Hoàng"><td><div class="person"><div class="avatar" style="background:#cc5360">HH</div><div><b>Đỗ Huy Hoàng</b><span>16 task</span></div></div></td><td class="n">16</td><td>12</td><td>9</td><td class="warn">3</td><td class="bad">2</td><td>2</td><td class="bad">3</td><td>28</td><td>75.0%</td><td>75.0%</td><td><span class="score m">75.0</span></td></tr>\n        </tbody>\n      </table>\n    </div>\n  </div>\n  <div>\n    <div class="card">\n      <div class="card-head"><div><div class="card-title">Cơ cấu trạng thái</div><div class="card-sub">Tỷ trọng và số Task tuyệt đối</div></div></div>\n      <div class="donut-row"><div class="donut"><div class="donut-txt"><div><strong>126</strong><span>TỔNG TASK</span></div></div></div>\n      <div class="legend"><div class="leg"><span class="dot" style="background:#16a568"></span><span>Đúng hạn</span><strong>94</strong></div><div class="leg"><span class="dot" style="background:#e99b2d"></span><span>HT trễ</span><strong>14</strong></div><div class="leg"><span class="dot" style="background:#de4e59"></span><span>Quá hạn</span><strong>7</strong></div><div class="leg"><span class="dot" style="background:#2f83d5"></span><span>Đang làm</span><strong>11</strong></div></div></div>\n    </div>\n    <div class="card" style="margin-top:13px">\n      <div class="card-head"><div><div class="card-title">Quá hạn theo cán bộ</div><div class="card-sub">Ranking cần ưu tiên xử lý</div></div></div>\n      <div class="bar-list"><div class="bar-row"><span>Đỗ Huy Hoàng</span><div class="track"><div class="fill fill-risk" style="width:100%"></div></div><strong>3</strong></div><div class="bar-row"><span>Thu Nga</span><div class="track"><div class="fill fill-risk" style="width:67%"></div></div><strong>2</strong></div><div class="bar-row"><span>Quốc Việt</span><div class="track"><div class="fill fill-risk" style="width:34%"></div></div><strong>1</strong></div><div class="bar-row"><span>Quang Long</span><div class="track"><div class="fill fill-risk" style="width:34%"></div></div><strong>1</strong></div></div>\n    </div>\n  </div>\n</section>\n\n<section class="grid-3">\n  <div class="card"><div class="card-head"><div><div class="card-title">Xu hướng Task hoàn thành theo tháng</div><div class="card-sub">Theo dõi khả năng xử lý workload trong năm</div></div><span class="tag">2026 YTD</span></div>\n    <div class="trend"><div class="mc"><span class="mv">72</span><div class="mb" style="height:55%"></div><span class="ml">T1</span></div><div class="mc"><span class="mv">84</span><div class="mb" style="height:64%"></div><span class="ml">T2</span></div><div class="mc"><span class="mv">91</span><div class="mb" style="height:69%"></div><span class="ml">T3</span></div><div class="mc"><span class="mv">88</span><div class="mb" style="height:67%"></div><span class="ml">T4</span></div><div class="mc"><span class="mv">97</span><div class="mb" style="height:74%"></div><span class="ml">T5</span></div><div class="mc"><span class="mv">101</span><div class="mb" style="height:77%"></div><span class="ml">T6</span></div><div class="mc"><span class="mv">96</span><div class="mb" style="height:73%"></div><span class="ml">T7</span></div><div class="mc"><span class="mv">108</span><div class="mb" style="height:83%"></div><span class="ml">T8</span></div><div class="mc"><span class="mv">0</span><div class="mb" style="height:2%;opacity:.2"></div><span class="ml">T9</span></div><div class="mc"><span class="mv">0</span><div class="mb" style="height:2%;opacity:.2"></div><span class="ml">T10</span></div><div class="mc"><span class="mv">0</span><div class="mb" style="height:2%;opacity:.2"></div><span class="ml">T11</span></div><div class="mc"><span class="mv">0</span><div class="mb" style="height:2%;opacity:.2"></div><span class="ml">T12</span></div></div>\n  </div>\n  <div class="card"><div class="card-head"><div><div class="card-title">Aging Task quá hạn</div><div class="card-sub">Theo số ngày chậm</div></div></div>\n    <div class="age"><div class="age-col"><b>3</b><div class="age-bar" style="height:58px"></div><span>1–3 ngày</span></div><div class="age-col"><b>2</b><div class="age-bar" style="height:40px"></div><span>4–7 ngày</span></div><div class="age-col"><b>1</b><div class="age-bar" style="height:25px"></div><span>8–14 ngày</span></div><div class="age-col"><b>1</b><div class="age-bar" style="height:25px"></div><span>&gt;14 ngày</span></div></div>\n  </div>\n  <div class="card"><div class="card-head"><div><div class="card-title">Management Attention</div><div class="card-sub">Điểm cần nêu trong báo cáo</div></div></div>\n    <div class="risks"><div class="risk"><div class="risk-ico ri-red"><svg viewBox="0 0 24 24"><path d="M12 3 2.5 20h19L12 3Z"/><path d="M12 9v5M12 17h.01"/></svg></div><div><b>7 Task đang quá hạn</b><p>2 Task chậm trên 7 ngày, cần xác định nguyên nhân và kế hoạch xử lý.</p></div></div><div class="risk"><div class="risk-ico ri-amber"><svg viewBox="0 0 24 24"><path d="M4 5h16v12H8l-4 4V5Z"/></svg></div><div><b>9 Task không comment trên 7 ngày</b><p>Cần cập nhật tiến độ để báo cáo phản ánh đúng trạng thái.</p></div></div><div class="risk"><div class="risk-ico ri-blue"><svg viewBox="0 0 24 24"><path d="M5 18V9M12 18V5M19 18v-7"/></svg></div><div><b>Workload tăng 9.4%</b><p>Nên xem đồng thời số Task và Complexity để đánh giá công bằng.</p></div></div></div>\n  </div>\n</section>\n\n<section class="card detail">\n  <div class="card-head"><div><div class="card-title">Drill-down Jira chi tiết</div><div class="card-sub" id="detailSub">Tất cả cán bộ · tất cả Task trong kỳ</div></div><span class="tag">Demo 5 Jira</span></div>\n  <div class="chips" id="chips"><button class="chip active" data-k="all">Tất cả</button><button class="chip" data-k="done">Đúng hạn</button><button class="chip" data-k="late">HT trễ</button><button class="chip" data-k="over">Quá hạn</button><button class="chip" data-k="doing">Đang làm</button><button class="chip" data-k="stale">Update muộn</button></div>\n  <div class="table-wrap" style="margin-top:9px"><table class="task-table"><thead><tr><th>Issue</th><th>Summary</th><th>Cán bộ</th><th>Complexity</th><th>Component</th><th>Due date</th><th>Resolution</th><th>Status</th><th>Kết quả</th><th>Chậm</th><th>Comment gần nhất</th></tr></thead>\n  <tbody id="taskRows">\n    <tr data-person="Nguyễn Thị Hồng Hoa" data-k="done"><td class="issue">BANCORE-8281</td><td>Rà soát tài liệu nghiệp vụ Core</td><td>Nguyễn Thị Hồng Hoa</td><td>Complex</td><td>Fusion</td><td>18/08/2026</td><td>17/08/2026</td><td>Done</td><td><span class="status s-done">Đúng hạn</span></td><td>0</td><td>17/08/2026</td></tr>\n    <tr data-person="Bùi Quang Long" data-k="late"><td class="issue">BANCORE-8288</td><td>Phối hợp xử lý lỗi SIT</td><td>Bùi Quang Long</td><td>Very Complex</td><td>Integration</td><td>18/08/2026</td><td>20/08/2026</td><td>Done</td><td><span class="status s-late">HT trễ</span></td><td>2</td><td>20/08/2026</td></tr>\n    <tr data-person="Nguyễn Quốc Việt" data-k="over"><td class="issue">BANCORE-8294</td><td>Hoàn thiện testcase UAT</td><td>Nguyễn Quốc Việt</td><td>Medium</td><td>QA</td><td>17/08/2026</td><td>—</td><td>In Progress</td><td><span class="status s-over">Quá hạn</span></td><td>5</td><td>14/08/2026</td></tr>\n    <tr data-person="Nguyễn Thị Thu Nga" data-k="doing"><td class="issue">BANCORE-8301</td><td>Đối soát kết quả chuyển đổi dữ liệu</td><td>Nguyễn Thị Thu Nga</td><td>Complex</td><td>Migration</td><td>28/08/2026</td><td>—</td><td>In Progress</td><td><span class="status s-doing">Đang làm</span></td><td>—</td><td>21/08/2026</td></tr>\n    <tr data-person="Đỗ Huy Hoàng" data-k="stale"><td class="issue">BANCORE-8266</td><td>Xử lý tồn tại Integration</td><td>Đỗ Huy Hoàng</td><td>Very Complex</td><td>Integration</td><td>26/08/2026</td><td>—</td><td>In Progress</td><td><span class="status s-late">Update muộn</span></td><td>—</td><td>10/08/2026</td></tr>\n  </tbody></table></div>\n  <div class="detail-panel" id="detailPanel"><b id="detailTitle"></b><p id="detailText"></p></div>\n  <div class="demo">Bản xem trước HTML · số liệu đang là dữ liệu minh họa trước khi nối Jira API thật.</div>\n</section>\n</div>\n\n</body>\n</html>'
+DYNAMIC_SCRIPT = '\n<script>\n(() => {\n  const DATA = __DATA_JSON__;\n  const META = __META_JSON__;\n  const DONE = new Set(["done","closed","resolved"]);\n  const OUTSIDE = new Set(["ngoai_bsc","outside_bsc"]);\n  const W = {"Very Complex":5,"Complex":4,"Medium":3,"Simple":2,"Very Simple":1,"Không phân loại":1};\n\n  const $ = (q, root=document) => root.querySelector(q);\n  const $$ = (q, root=document) => [...root.querySelectorAll(q)];\n  const esc = s => String(s ?? "").replace(/[&<>"\']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",\'"\':"&quot;","\'":"&#39;"}[m]));\n\n  function parseDate(s){\n    if(!s) return null;\n    const p = String(s).slice(0,10).split("-").map(Number);\n    if(p.length !== 3 || !p[0] || !p[1] || !p[2]) return null;\n    return new Date(Date.UTC(p[0], p[1]-1, p[2]));\n  }\n  function fmtDate(s){\n    const d=parseDate(s); if(!d) return "—";\n    return `${String(d.getUTCDate()).padStart(2,"0")}/${String(d.getUTCMonth()+1).padStart(2,"0")}/${d.getUTCFullYear()}`;\n  }\n  function diffDays(a,b){ return Math.floor((a-b)/86400000); }\n  function today(){ const n=new Date(); return new Date(Date.UTC(n.getFullYear(),n.getMonth(),n.getDate())); }\n\n  const ptype=$("#ptype"), pvalue=$("#pvalue"), staff=$("#staff"), plabel=$("#plabel");\n  const basisSelect=$(".filters .filter:nth-child(4) select");\n  const metricEls=$$(".metric");\n  const summaryTargets=$$(".target");\n  const staffBody=$("#staffRows");\n  const chips=$$("#chips .chip");\n  const taskBody=$("#taskRows");\n  const detailSub=$("#detailSub");\n  const detailPanel=$("#detailPanel"), detailTitle=$("#detailTitle"), detailText=$("#detailText");\n\n  const api=$(".api");\n  api.innerHTML = `<span class="live-dot"></span> Jira API · ${esc(META.loadedAt)} · ${esc(META.user)} · ${META.issueCount} Jira`;\n\n  let kind="all";\n\n  function basisKey(){\n    const v=basisSelect.value;\n    if(v==="Hoàn thành trong kỳ") return "resolution";\n    if(v==="Created trong kỳ") return "created";\n    return "due";\n  }\n\n  function periodIdForDate(s, type){\n    const d=parseDate(s); if(!d) return "";\n    const y=d.getUTCFullYear(), m=d.getUTCMonth()+1;\n    if(type==="month") return `${y}-${String(m).padStart(2,"0")}`;\n    if(type==="quarter") return `${y}-Q${Math.floor((m-1)/3)+1}`;\n    return String(y);\n  }\n\n  function prettyPeriod(id,type){\n    if(type==="month"){\n      const [y,m]=id.split("-");\n      return `${m}/${y}`;\n    }\n    if(type==="quarter"){\n      const [y,q]=id.split("-");\n      return `${q}/${y}`;\n    }\n    return id;\n  }\n\n  function periodStartEnd(id,type){\n    if(type==="month"){\n      const [y,m]=id.split("-").map(Number);\n      return [new Date(Date.UTC(y,m-1,1)), new Date(Date.UTC(y,m,0))];\n    }\n    if(type==="quarter"){\n      const [ys,qs]=id.split("-Q"); const y=Number(ys), q=Number(qs);\n      const sm=(q-1)*3;\n      return [new Date(Date.UTC(y,sm,1)), new Date(Date.UTC(y,sm+3,0))];\n    }\n    const y=Number(id);\n    return [new Date(Date.UTC(y,0,1)),new Date(Date.UTC(y,11,31))];\n  }\n\n  function currentPeriodId(type){\n    const t=today(), y=t.getUTCFullYear(), m=t.getUTCMonth()+1;\n    if(type==="month") return `${y}-${String(m).padStart(2,"0")}`;\n    if(type==="quarter") return `${y}-Q${Math.floor((m-1)/3)+1}`;\n    return String(y);\n  }\n\n  function fillPeriods(){\n    const type=ptype.value, key=basisKey();\n    const ids=[...new Set(DATA.map(x=>periodIdForDate(x[key],type)).filter(Boolean))]\n      .sort((a,b)=>b.localeCompare(a));\n    const cur=currentPeriodId(type);\n    pvalue.innerHTML=ids.map(id=>`<option value="${esc(id)}">${esc(prettyPeriod(id,type))}</option>`).join("");\n    const chosen=ids.includes(cur) ? cur : (ids.find(x=>x<=cur) || ids[0] || cur);\n    pvalue.value=chosen;\n  }\n\n  function itemState(x, asOf){\n    const due=parseDate(x.due), res=parseDate(x.resolution);\n    const currentDone=DONE.has(String(x.status||"").toLowerCase());\n    const done = (!!res && res<=asOf) || (!res && currentDone);\n    const ontime = done && !!res && !!due && res<=due;\n    const late = done && !!res && !!due && res>due;\n    const overdue = !done && !!due && due<asOf;\n    const doing = !done && !overdue;\n\n    const freshnessSource = x.commentDate || x.updated;\n    const freshness = freshnessSource ? diffDays(asOf,parseDate(freshnessSource)) : 9999;\n    const stale = !done && freshness>7;\n    const outside=(x.labels||[]).some(l=>OUTSIDE.has(String(l).toLowerCase()));\n    const workload=Number(W[x.complexity] || 1);\n\n    let result="Khác";\n    if(ontime) result="Hoàn thành đúng hạn";\n    else if(late) result="Hoàn thành trễ";\n    else if(overdue) result="Quá hạn chưa Done";\n    else if(doing) result="Đang thực hiện";\n    else if(done) result="Đã hoàn thành";\n\n    let daysLate=0;\n    if(late) daysLate=diffDays(res,due);\n    else if(overdue) daysLate=diffDays(asOf,due);\n\n    return {...x,done,ontime,late,overdue,doing,stale,outside,workload,result,daysLate,freshness};\n  }\n\n  function filteredBase(){\n    const key=basisKey(), type=ptype.value, pid=pvalue.value;\n    return DATA.filter(x=>periodIdForDate(x[key],type)===pid);\n  }\n\n  function computeForPeriod(pid, who){\n    const original=pvalue.value;\n    pvalue.value=pid;\n    const [,end]=periodStartEnd(pid,ptype.value);\n    const now=today(), asOf=now<end?now:end;\n    let rows=filteredBase().map(x=>itemState(x,asOf));\n    if(who && who!=="Tất cả cán bộ") rows=rows.filter(x=>x.assignee===who);\n    pvalue.value=original;\n\n    const total=rows.length, done=rows.filter(x=>x.done).length, ontime=rows.filter(x=>x.ontime).length;\n    const late=rows.filter(x=>x.late).length, overdue=rows.filter(x=>x.overdue).length, doing=rows.filter(x=>x.doing).length;\n    const stale=rows.filter(x=>x.stale).length, outside=rows.filter(x=>x.outside).length;\n    const workload=rows.reduce((a,x)=>a+x.workload,0);\n    const completionRate=total?done*100/total:0;\n    const known=ontime+late, ontimeRate=known?ontime*100/known:0;\n    const score=.70*completionRate+.30*ontimeRate;\n    return {rows,total,done,ontime,late,overdue,doing,stale,outside,workload,completionRate,ontimeRate,score,asOf};\n  }\n\n  function compute(){ return computeForPeriod(pvalue.value,staff.value); }\n\n  function previousPeriodId(){\n    const type=ptype.value, pid=pvalue.value;\n    if(type==="month"){\n      const [y,m]=pid.split("-").map(Number), d=new Date(Date.UTC(y,m-2,1));\n      return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}`;\n    }\n    if(type==="quarter"){\n      let [ys,qs]=pid.split("-Q"), y=Number(ys), q=Number(qs)-1;\n      if(q===0){q=4;y--;}\n      return `${y}-Q${q}`;\n    }\n    return String(Number(pid)-1);\n  }\n\n  function pct(n,d){ return d ? 100*n/d : 0; }\n  function sign(v,suffix="%"){ return Number.isFinite(v) ? `${v>=0?"+":""}${v.toFixed(1)}${suffix}` : "Kỳ đầu"; }\n\n  function setMetric(i,label,value,delta,meta,deltaClass){\n    const el=metricEls[i]; if(!el) return;\n    $(".metric-label",el).textContent=label;\n    $(".metric-value",el).textContent=value;\n    $(".metric-meta",el).innerHTML=(delta?`<span class="delta ${deltaClass}">${esc(delta)}</span>`:"")+meta;\n  }\n\n  function renderMetrics(m){\n    const pm=computeForPeriod(previousPeriodId(),staff.value);\n    const dTotal=pm.total ? 100*(m.total-pm.total)/pm.total : NaN;\n    const dWork=pm.workload ? 100*(m.workload-pm.workload)/pm.workload : NaN;\n    const dScore=m.score-pm.score;\n\n    setMetric(0,"Tổng công việc",m.total.toLocaleString("vi-VN"),sign(dTotal),"so kỳ trước",dTotal>=0?"up":"down");\n    setMetric(1,"Đã hoàn thành",m.done.toLocaleString("vi-VN"),`${m.completionRate.toFixed(1)}%`,"tổng Task","up");\n    setMetric(2,"Đúng hạn",m.ontime.toLocaleString("vi-VN"),`${m.ontimeRate.toFixed(1)}%`,"số Done","neutral");\n    setMetric(3,"Hoàn thành trễ",m.late.toLocaleString("vi-VN"),`${pct(m.late,m.total).toFixed(1)}%`,"tổng Task","down");\n    setMetric(4,"Quá hạn chưa Done",m.overdue.toLocaleString("vi-VN"),`${pct(m.overdue,m.total).toFixed(1)}%`,"cần xử lý","down");\n    setMetric(5,"Đang thực hiện",m.doing.toLocaleString("vi-VN"),`${pct(m.doing,m.total).toFixed(1)}%`,"tổng Task","neutral");\n    setMetric(6,"Cập nhật muộn",m.stale.toLocaleString("vi-VN"),`${pct(m.stale,m.total).toFixed(1)}%`,"comment/updated > 7 ngày","down");\n    setMetric(7,"Ngoài BSC",m.outside.toLocaleString("vi-VN"),`${pct(m.outside,m.total).toFixed(1)}%`,"theo Labels","neutral");\n    setMetric(8,"Workload điểm",m.workload.toLocaleString("vi-VN"),sign(dWork),"theo Complexity",dWork>=0?"up":"down");\n    setMetric(9,"BSC hiệu suất",`${m.score.toFixed(1)}%`,sign(dScore,"đ"),"so kỳ trước",dScore>=0?"up":"down");\n\n    const completionGap=m.completionRate-90, ontimeGap=m.ontimeRate-90, overRate=pct(m.overdue,m.total), overGap=overRate-5;\n    const cls=(ok)=>ok?"good":"bad";\n    summaryTargets[0].innerHTML=`<span>Hoàn thành / mục tiêu</span><strong class="${cls(completionGap>=0)}">${m.completionRate.toFixed(1)}% / 90%</strong><small class="${cls(completionGap>=0)}">${completionGap>=0?"Vượt":"Thiếu"} ${Math.abs(completionGap).toFixed(1)} điểm %</small>`;\n    summaryTargets[1].innerHTML=`<span>Đúng hạn / mục tiêu</span><strong class="${cls(ontimeGap>=0)}">${m.ontimeRate.toFixed(1)}% / 90%</strong><small class="${cls(ontimeGap>=0)}">${ontimeGap>=0?"Vượt":"Thiếu"} ${Math.abs(ontimeGap).toFixed(1)} điểm %</small>`;\n    summaryTargets[2].innerHTML=`<span>Quá hạn / ngưỡng</span><strong class="${cls(overGap<=0)}">${overRate.toFixed(1)}% / ≤5%</strong><small class="${cls(overGap<=0)}">${overGap<=0?"Trong ngưỡng":"Vượt"} ${Math.abs(overGap).toFixed(1)} điểm %</small>`;\n    summaryTargets[3].innerHTML=`<span>BSC tổng hợp</span><strong class="${cls(m.score>=80)}">${m.score.toFixed(1)}%</strong><small class="${dScore>=0?"good":"bad"}">${dScore>=0?"+":""}${dScore.toFixed(1)} điểm kỳ trước</small>`;\n  }\n\n  function staffAgg(rows){\n    const map=new Map();\n    for(const x of rows){\n      if(!map.has(x.assignee)) map.set(x.assignee,[]);\n      map.get(x.assignee).push(x);\n    }\n    return [...map.entries()].map(([name,a])=>{\n      const total=a.length,done=a.filter(x=>x.done).length,ontime=a.filter(x=>x.ontime).length,late=a.filter(x=>x.late).length;\n      const overdue=a.filter(x=>x.overdue).length,doing=a.filter(x=>x.doing).length,stale=a.filter(x=>x.stale).length;\n      const workload=a.reduce((s,x)=>s+x.workload,0), cr=pct(done,total), or=pct(ontime,ontime+late), score=.7*cr+.3*or;\n      return {name,total,done,ontime,late,overdue,doing,stale,workload,cr,or,score};\n    }).sort((a,b)=>b.score-a.score || b.workload-a.workload);\n  }\n\n  function initials(name){ return name.split(/\\s+/).filter(Boolean).slice(-2).map(x=>x[0]).join("").toUpperCase(); }\n  const avatarColors=["#247fc7","#159c87","#6f59b5","#d88b31","#cc5360","#2b89ad","#168b62","#825bb0"];\n\n  function renderStaff(m){\n    const base=computeForPeriod(pvalue.value,"Tất cả cán bộ").rows;\n    const agg=staffAgg(base);\n    staffBody.innerHTML=agg.map((x,i)=>{\n      const sc=x.score>=85?"g":x.score>=70?"m":"r";\n      return `<tr data-person="${esc(x.name)}"><td><div class="person"><div class="avatar" style="background:${avatarColors[i%avatarColors.length]}">${esc(initials(x.name))}</div><div><b>${esc(x.name)}</b><span>${x.total} task</span></div></div></td><td class="n">${x.total}</td><td class="good n">${x.done}</td><td>${x.ontime}</td><td class="warn">${x.late}</td><td class="${x.overdue?"bad":""}">${x.overdue}</td><td>${x.doing}</td><td class="${x.stale?"bad":""}">${x.stale}</td><td>${x.workload}</td><td>${x.cr.toFixed(1)}%</td><td>${x.or.toFixed(1)}%</td><td><span class="score ${sc}">${x.score.toFixed(1)}</span></td></tr>`;\n    }).join("");\n\n    $$("#staffRows tr").forEach(row=>{\n      row.addEventListener("click",()=>{\n        staff.value=row.dataset.person;\n        renderAll();\n        $(".detail").scrollIntoView({behavior:"smooth"});\n      });\n    });\n\n    const tag=$(".grid-main .card .tag");\n    if(tag) tag.textContent=`${agg.length} cán bộ`;\n  }\n\n  function renderDonut(m){\n    const donut=$(".donut");\n    const vals=[m.ontime,m.late,m.overdue,m.doing];\n    const total=Math.max(1,m.total);\n    let a=0;\n    const colors=["#16a568","#e99b2d","#de4e59","#2f83d5"];\n    const stops=[];\n    vals.forEach((v,i)=>{const b=a+100*v/total;stops.push(`${colors[i]} ${a}% ${b}%`);a=b;});\n    if(a<100) stops.push(`#8c65c8 ${a}% 100%`);\n    donut.style.background=`conic-gradient(${stops.join(",")})`;\n    $(".donut-txt strong").textContent=m.total;\n    const ls=$$(".legend .leg");\n    const texts=[["Đúng hạn",m.ontime],["HT trễ",m.late],["Quá hạn",m.overdue],["Đang làm",m.doing]];\n    ls.forEach((el,i)=>{if(!texts[i])return;el.children[1].textContent=texts[i][0];el.children[2].textContent=texts[i][1];});\n  }\n\n  function renderOverdueRanking(m){\n    const box=$(".bar-list");\n    const agg=staffAgg(computeForPeriod(pvalue.value,"Tất cả cán bộ").rows).filter(x=>x.overdue>0).sort((a,b)=>b.overdue-a.overdue);\n    const max=Math.max(1,...agg.map(x=>x.overdue));\n    box.innerHTML=agg.length ? agg.map(x=>`<div class="bar-row"><span>${esc(x.name)}</span><div class="track"><div class="fill fill-risk" style="width:${100*x.overdue/max}%"></div></div><strong>${x.overdue}</strong></div>`).join("") : `<div style="font-size:10px;color:#8295a5">Không có Task quá hạn.</div>`;\n  }\n\n  function renderTrend(){\n    const pid=pvalue.value;\n    const y=Number(ptype.value==="year"?pid:pid.slice(0,4));\n    const arr=[];\n    for(let mo=1;mo<=12;mo++){\n      const count=DATA.filter(x=>{\n        const r=parseDate(x.resolution);\n        return r && r.getUTCFullYear()===y && r.getUTCMonth()+1===mo;\n      }).length;\n      arr.push(count);\n    }\n    const max=Math.max(1,...arr);\n    $(".trend").innerHTML=arr.map((v,i)=>`<div class="mc"><span class="mv">${v}</span><div class="mb" style="height:${v?Math.max(8,100*v/max):2}%;${v?"":"opacity:.2"}"></div><span class="ml">T${i+1}</span></div>`).join("");\n    const tag=$(".grid-3 .card .tag"); if(tag) tag.textContent=`${y} YTD`;\n  }\n\n  function renderAging(m){\n    const bins=[\n      ["1–3 ngày",x=>x>=1&&x<=3],\n      ["4–7 ngày",x=>x>=4&&x<=7],\n      ["8–14 ngày",x=>x>=8&&x<=14],\n      [">14 ngày",x=>x>14]\n    ];\n    const vals=bins.map(b=>m.rows.filter(x=>x.overdue&&b[1](x.daysLate)).length);\n    const max=Math.max(1,...vals);\n    $(".age").innerHTML=bins.map((b,i)=>`<div class="age-col"><b>${vals[i]}</b><div class="age-bar" style="height:${vals[i]?Math.max(18,120*vals[i]/max):4}px"></div><span>${b[0]}</span></div>`).join("");\n  }\n\n  function renderRisks(m){\n    const over7=m.rows.filter(x=>x.overdue&&x.daysLate>7).length;\n    $(".risks").innerHTML=\n      `<div class="risk"><div class="risk-ico ri-red"><svg viewBox="0 0 24 24"><path d="M12 3 2.5 20h19L12 3Z"/><path d="M12 9v5M12 17h.01"/></svg></div><div><b>${m.overdue} Task đang quá hạn</b><p>${over7} Task chậm trên 7 ngày, cần xác định nguyên nhân và kế hoạch xử lý.</p></div></div>`+\n      `<div class="risk"><div class="risk-ico ri-amber"><svg viewBox="0 0 24 24"><path d="M4 5h16v12H8l-4 4V5Z"/></svg></div><div><b>${m.stale} Task không cập nhật trên 7 ngày</b><p>Ưu tiên Comment mới nhất; nếu Search không trả comment thì dùng Updated.</p></div></div>`+\n      `<div class="risk"><div class="risk-ico ri-blue"><svg viewBox="0 0 24 24"><path d="M5 18V9M12 18V5M19 18v-7"/></svg></div><div><b>Workload ${m.workload} điểm</b><p>Đánh giá số Task cùng Complexity để báo cáo BSC công bằng hơn.</p></div></div>`;\n  }\n\n  function renderChips(m){\n    const counts={\n      all:m.rows.length,\n      done:m.rows.filter(x=>x.ontime).length,\n      late:m.rows.filter(x=>x.late).length,\n      over:m.rows.filter(x=>x.overdue).length,\n      doing:m.rows.filter(x=>x.doing).length,\n      stale:m.rows.filter(x=>x.stale).length\n    };\n    const names={all:"Tất cả",done:"Đúng hạn",late:"HT trễ",over:"Quá hạn",doing:"Đang làm",stale:"Update muộn"};\n    chips.forEach(c=>{c.textContent=`${names[c.dataset.k]} ${counts[c.dataset.k]}`;c.classList.toggle("active",c.dataset.k===kind);});\n  }\n\n  function taskKindMatch(x){\n    if(kind==="all") return true;\n    if(kind==="done") return x.ontime;\n    if(kind==="late") return x.late;\n    if(kind==="over") return x.overdue;\n    if(kind==="doing") return x.doing;\n    if(kind==="stale") return x.stale;\n    return true;\n  }\n\n  function renderTasks(m){\n    const rows=m.rows.filter(taskKindMatch);\n    taskBody.innerHTML=rows.map(x=>{\n      const cls=x.ontime?"s-done":x.late?"s-late":x.overdue?"s-over":x.doing?"s-doing":"s-late";\n      const label=x.ontime?"Đúng hạn":x.late?"HT trễ":x.overdue?"Quá hạn":x.stale?"Update muộn":x.doing?"Đang làm":x.result;\n      return `<tr data-key="${esc(x.key)}"><td class="issue"><a href="${esc(x.url)}" target="_blank" style="color:inherit;text-decoration:none">${esc(x.key)}</a></td><td>${esc(x.summary)}</td><td>${esc(x.assignee)}</td><td>${esc(x.complexity)}</td><td>${esc((x.components||[]).join("; "))}</td><td>${fmtDate(x.due)}</td><td>${fmtDate(x.resolution)}</td><td>${esc(x.status)}</td><td><span class="status ${cls}">${esc(label)}</span></td><td>${x.daysLate||"—"}</td><td>${fmtDate(x.commentDate||x.updated)}</td></tr>`;\n    }).join("");\n\n    $$("tr",taskBody).forEach(tr=>tr.addEventListener("click",()=>{\n      const x=rows.find(z=>z.key===tr.dataset.key); if(!x)return;\n      detailTitle.textContent=`${x.key} — ${x.summary}`;\n      const commentText=x.commentBody ? ` • Nội dung: ${x.commentBody}` : "";\n      detailText.textContent=`Cán bộ: ${x.assignee} • Complexity: ${x.complexity} • Component: ${(x.components||[]).join("; ")} • Due: ${fmtDate(x.due)} • Resolution: ${fmtDate(x.resolution)} • Status: ${x.status} • Cập nhật gần nhất: ${fmtDate(x.commentDate||x.updated)}${commentText}`;\n      detailPanel.classList.add("show");\n    }));\n    detailSub.textContent=`${staff.value} · ${rows.length} Task đang hiển thị`;\n    const tag=$(".detail .tag"); if(tag) tag.textContent=`${rows.length} Jira`;\n  }\n\n  function fillStaff(){\n    const current=staff.value||"Tất cả cán bộ";\n    const names=[...new Set(DATA.map(x=>x.assignee).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"vi"));\n    staff.innerHTML=`<option>Tất cả cán bộ</option>`+names.map(x=>`<option>${esc(x)}</option>`).join("");\n    staff.value=names.includes(current)?current:"Tất cả cán bộ";\n  }\n\n  function updatePeriodLabel(){\n    const t={month:"THÁNG",quarter:"QUÝ",year:"NĂM"}[ptype.value];\n    plabel.textContent=`BSC ${t} ${prettyPeriod(pvalue.value,ptype.value)}`;\n  }\n\n  function renderAll(){\n    updatePeriodLabel();\n    const m=compute();\n    renderMetrics(m);\n    renderStaff(m);\n    renderDonut(m);\n    renderOverdueRanking(m);\n    renderTrend();\n    renderAging(m);\n    renderRisks(m);\n    renderChips(m);\n    renderTasks(m);\n  }\n\n  fillStaff();\n  fillPeriods();\n  ptype.addEventListener("change",()=>{fillPeriods();renderAll();});\n  basisSelect.addEventListener("change",()=>{fillPeriods();renderAll();});\n  pvalue.addEventListener("change",renderAll);\n  staff.addEventListener("change",renderAll);\n  chips.forEach(c=>c.addEventListener("click",()=>{kind=c.dataset.k;renderAll();}));\n  renderAll();\n})();\n</script>\n'
 
-# ---------------------------------------------------------------------
-# HELPERS
-# ---------------------------------------------------------------------
 def secret(name: str, default: str = "") -> str:
     env = os.getenv(name)
     if env:
@@ -104,690 +41,135 @@ def secret(name: str, default: str = "") -> str:
     except Exception:
         return default
 
-
-def txt(value: Any) -> str:
+def text_value(value: Any) -> str:
     if value is None:
         return ""
     if isinstance(value, str):
         return value
     if isinstance(value, list):
-        return "; ".join(txt(v) for v in value if txt(v))
+        vals = [text_value(x) for x in value]
+        return "; ".join(x for x in vals if x)
     if isinstance(value, dict):
         for k in ("value", "name", "displayName", "key", "id"):
             if value.get(k) not in (None, ""):
                 return str(value[k])
     return str(value)
 
-
-def parse_dates(s: pd.Series) -> pd.Series:
-    out = pd.to_datetime(s.replace({"": None}), errors="coerce", utc=True)
-    try:
-        return out.dt.tz_convert("Asia/Ho_Chi_Minh").dt.tz_localize(None)
-    except Exception:
-        return pd.to_datetime(s, errors="coerce")
-
-
-def fmt_date(x: Any) -> str:
-    if pd.isna(x):
+def iso_date(value: Any) -> str:
+    if not value:
         return ""
-    return pd.Timestamp(x).strftime("%d/%m/%Y")
+    return str(value)[:10]
 
+def latest_comment_from_search(comment_field: Any) -> dict[str, str]:
+    if not isinstance(comment_field, dict):
+        return {"date": "", "author": "", "body": ""}
+    comments = comment_field.get("comments") or []
+    if not comments:
+        return {"date": "", "author": "", "body": ""}
 
-def field_value(fields: dict[str, Any], fid: str | None) -> Any:
-    return fields.get(fid) if fid else None
+    valid = [x for x in comments if isinstance(x, dict)]
+    c = max(valid, key=lambda x: str(x.get("created") or ""), default={})
+    parts: list[str] = []
 
+    def walk(node: Any):
+        if isinstance(node, dict):
+            if node.get("type") == "text" and node.get("text"):
+                parts.append(str(node["text"]))
+            for child in node.get("content", []) or []:
+                walk(child)
+        elif isinstance(node, list):
+            for child in node:
+                walk(child)
+        elif isinstance(node, str):
+            parts.append(node)
 
-def issues_to_df(issues, complexity_id=None, epic_id=None):
-    rows = []
-    for issue in issues:
-        f = issue.get("fields") or {}
-        assignee = f.get("assignee") or {}
-        status = f.get("status") or {}
-        itype = f.get("issuetype") or {}
-        comps = f.get("components") or []
-        parent = f.get("parent") or {}
-        rows.append({
-            "_key": str(issue.get("key") or ""),
-            "_summary": str(f.get("summary") or ""),
-            "_assignee": str(assignee.get("displayName") or "(Chưa phân công)"),
-            "_status": str(status.get("name") or ""),
-            "_issue_type": str(itype.get("name") or ""),
-            "_due_raw": f.get("duedate"),
-            "_resolution_raw": f.get("resolutiondate"),
-            "_created_raw": f.get("created"),
-            "_updated_raw": f.get("updated"),
-            "_labels": "; ".join(str(x) for x in (f.get("labels") or [])),
-            "_components": "; ".join(str(x.get("name") or "") for x in comps if isinstance(x, dict)),
-            "_complexity": txt(field_value(f, complexity_id)) or "Không phân loại",
-            "_parent": txt(parent) or txt(field_value(f, epic_id)),
-        })
-    df = pd.DataFrame(rows)
-    if df.empty:
-        return df
-    for raw, dest in [
-        ("_due_raw", "_due"),
-        ("_resolution_raw", "_resolution"),
-        ("_created_raw", "_created"),
-        ("_updated_raw", "_updated"),
-    ]:
-        df[dest] = parse_dates(df[raw])
-    # Due date là hạn hết ngày
-    df["_due"] = df["_due"].dt.normalize() + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1)
-    return df
+    walk(c.get("body"))
+    return {
+        "date": iso_date(c.get("created")),
+        "author": str((c.get("author") or {}).get("displayName") or ""),
+        "body": " ".join(x.strip() for x in parts if x.strip())[:500],
+    }
 
+def load_jira_records():
+    base_url = secret("JIRA_BASE_URL")
+    email = secret("JIRA_EMAIL")
+    token = secret("JIRA_API_TOKEN")
+    jql = secret("JIRA_DEFAULT_JQL", DEFAULT_JQL)
 
-def load_jira(base_url: str, email: str, token: str, jql: str):
+    if not (base_url and email and token):
+        raise JiraApiError("Thiếu JIRA_BASE_URL, JIRA_EMAIL hoặc JIRA_API_TOKEN trong Streamlit Secrets.")
+
     client = JiraClient(base_url, email, token)
     info = client.test_connection()
     catalog = client.get_fields()
-    complexity_id = client.resolve_field_id(catalog, ["Complexity", "Độ phức tạp", "Do phuc tap"])
-    epic_id = client.resolve_field_id(catalog, ["Epic Link", "Parent Epic", "Parent Link"])
+
+    complexity_id = client.resolve_field_id(
+        catalog, ["Complexity", "Độ phức tạp", "Do phuc tap"]
+    )
+    epic_id = client.resolve_field_id(
+        catalog, ["Epic Link", "Parent Epic", "Parent Link"]
+    )
 
     fields = [
         "summary", "assignee", "status", "issuetype", "duedate",
-        "resolutiondate", "created", "updated", "labels", "components", "parent",
+        "resolutiondate", "created", "updated", "labels", "components",
+        "parent", "comment",
     ]
     for fid in (complexity_id, epic_id):
         if fid and fid not in fields:
             fields.append(fid)
 
     issues = client.search_issues(jql, fields, page_size=100, max_issues=10000)
-    return issues_to_df(issues, complexity_id, epic_id), {
-        "user": info.display_name,
-        "loaded_at": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-        "complexity_id": complexity_id,
-        "epic_id": epic_id,
-    }
+    records = []
 
+    for issue in issues:
+        f = issue.get("fields") or {}
+        assignee = f.get("assignee") or {}
+        status = f.get("status") or {}
+        comments = latest_comment_from_search(f.get("comment"))
 
-def sync_comments(base_url, email, token, keys, force=False):
-    cache = st.session_state.setdefault("comment_cache", {})
-    need = list(keys) if force else [k for k in keys if k not in cache]
-    if not need:
-        return
-    client = JiraClient(base_url, email, token)
-    cache.update(client.latest_comments_bulk(need, workers=8))
+        complexity = text_value(f.get(complexity_id)) if complexity_id else ""
+        if not complexity:
+            complexity = "Không phân loại"
 
-
-def apply_comments(df: pd.DataFrame) -> pd.DataFrame:
-    cache = st.session_state.get("comment_cache", {})
-    out = df.copy()
-    dates, authors, bodies, known = [], [], [], []
-    for key in out["_key"]:
-        in_cache = key in cache
-        c = cache.get(key)
-        if not in_cache or (isinstance(c, dict) and c.get("error")):
-            dates.append(None); authors.append(""); bodies.append(""); known.append(False)
-        elif c is None:
-            # Đã gọi API và Jira xác nhận issue không có comment.
-            dates.append(None); authors.append(""); bodies.append(""); known.append(True)
-        else:
-            dates.append(c.get("created"))
-            authors.append(c.get("author", ""))
-            bodies.append(c.get("body", ""))
-            known.append(True)
-    out["_last_comment"] = parse_dates(pd.Series(dates, index=out.index))
-    out["_last_comment_author"] = authors
-    out["_last_comment_text"] = bodies
-    out["_comment_known"] = known
-    return out
-
-
-def period_bounds(kind: str, label: str):
-    freq = {"Tháng": "M", "Quý": "Q", "Năm": "Y"}[kind]
-    p = pd.Period(label, freq=freq)
-    return p.start_time.normalize(), p.end_time.normalize() + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1)
-
-
-def period_options(dates: pd.Series, kind: str):
-    freq = {"Tháng": "M", "Quý": "Q", "Năm": "Y"}[kind]
-    d = dates.dropna()
-    if d.empty:
-        return [str(pd.Timestamp.now().to_period(freq))]
-    return sorted({str(x) for x in d.dt.to_period(freq)}, reverse=True)
-
-
-def previous_bounds(kind: str, label: str):
-    freq = {"Tháng": "M", "Quý": "Q", "Năm": "Y"}[kind]
-    p = pd.Period(label, freq=freq) - 1
-    return p.start_time.normalize(), p.end_time.normalize() + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1)
-
-
-def icon_svg(name: str) -> str:
-    icons = {
-        "tasks": '<svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>',
-        "done": '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16.5 8"/></svg>',
-        "time": '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
-        "late": '<svg viewBox="0 0 24 24"><path d="M5 18 18 5M10 5h8v8"/></svg>',
-        "over": '<svg viewBox="0 0 24 24"><path d="M12 3 2.5 20h19L12 3Z"/><path d="M12 9v5M12 17h.01"/></svg>',
-        "doing": '<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 3-6"/><path d="M4 4v5h5"/></svg>',
-        "comment": '<svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4V5Z"/><path d="M8 9h8M8 12h5"/></svg>',
-        "folder": '<svg viewBox="0 0 24 24"><path d="M4 6h7l2 3h7v9H4V6Z"/></svg>',
-        "workload": '<svg viewBox="0 0 24 24"><path d="M5 18V9M12 18V5M19 18v-7"/></svg>',
-        "star": '<svg viewBox="0 0 24 24"><path d="m12 3 2.5 5 5.5.8-4 3.9.9 5.5-4.9-2.6-4.9 2.6.9-5.5-4-3.9 5.5-.8L12 3Z"/></svg>',
-    }
-    return icons[name]
-
-
-def kpi_card(label, value, meta, css, icon, delta=None, delta_kind="neutral"):
-    # QUAN TRỌNG: trả HTML dạng một dòng, không có blank line/indent đầu dòng.
-    # Nếu có dòng trống + 4 khoảng trắng, Markdown của Streamlit có thể
-    # hiểu phần HTML kế tiếp là code block và hiển thị nguyên thẻ <div>.
-    delta_html = ""
-    if delta is not None:
-        cls = {"up": "delta-up", "down": "delta-down", "neutral": "delta-neutral"}[delta_kind]
-        delta_html = f'<span class="delta {cls}">{html.escape(str(delta))}</span>'
-    return (
-        f'<div class="kpi-card {css}">'
-        f'<div class="kpi-top">'
-        f'<span class="kpi-label">{html.escape(label)}</span>'
-        f'<span class="kpi-icon">{icon_svg(icon)}</span>'
-        f'</div>'
-        f'<div class="kpi-value">{html.escape(str(value))}</div>'
-        f'<div class="kpi-meta">{delta_html}{meta}</div>'
-        f'</div>'
-    )
-
-
-def calc_metrics(data: pd.DataFrame, as_of: pd.Timestamp, done_statuses, stale_days, outside_labels):
-    g = data.copy()
-    current_done = g["_status"].str.lower().isin(done_statuses)
-    done_asof = g["_resolution"].notna() & (g["_resolution"] <= as_of)
-    done_asof |= current_done & g["_resolution"].isna()
-
-    g["_done_asof"] = done_asof
-    g["_completed_on_time"] = done_asof & g["_resolution"].notna() & g["_due"].notna() & (g["_resolution"] <= g["_due"])
-    g["_completed_late"] = done_asof & g["_resolution"].notna() & g["_due"].notna() & (g["_resolution"] > g["_due"])
-    g["_overdue"] = (~done_asof) & g["_due"].notna() & (g["_due"] < as_of)
-    g["_doing"] = (~done_asof) & ~g["_overdue"]
-
-    g["_days_since_comment"] = (as_of.normalize() - g["_last_comment"].dt.normalize()).dt.days
-    g["_days_since_update"] = (as_of.normalize() - g["_updated"].dt.normalize()).dt.days
-
-    # Nếu đã đọc comment: dùng comment; chưa đọc comment: dùng Updated làm proxy.
-    freshness_days = g["_days_since_update"].copy()
-    freshness_days.loc[g["_comment_known"]] = g.loc[g["_comment_known"], "_days_since_comment"]
-    g["_freshness_days"] = freshness_days
-    g["_late_update"] = (~done_asof) & (freshness_days > stale_days)
-
-    labels = g["_labels"].fillna("").str.lower()
-    g["_outside_bsc"] = False
-    for lab in outside_labels:
-        g["_outside_bsc"] |= labels.str.contains(re.escape(lab), na=False)
-
-    g["_weight"] = g["_complexity"].map(COMPLEXITY_WEIGHT).fillna(1).astype(float)
-    g["_workload"] = g["_weight"]
-
-    g["_result"] = np.select(
-        [g["_completed_on_time"], g["_completed_late"], g["_overdue"], g["_doing"], g["_done_asof"]],
-        ["Hoàn thành đúng hạn", "Hoàn thành trễ", "Quá hạn chưa xong", "Đang thực hiện", "Đã hoàn thành"],
-        default="Khác",
-    )
-    g["_days_late"] = np.where(
-        g["_completed_late"],
-        (g["_resolution"].dt.normalize() - g["_due"].dt.normalize()).dt.days,
-        np.where(g["_overdue"], (as_of.normalize() - g["_due"].dt.normalize()).dt.days, 0),
-    )
-
-    total = len(g)
-    done = int(g["_done_asof"].sum())
-    ontime = int(g["_completed_on_time"].sum())
-    late = int(g["_completed_late"].sum())
-    overdue = int(g["_overdue"].sum())
-    doing = int(g["_doing"].sum())
-    stale = int(g["_late_update"].sum())
-    outside = int(g["_outside_bsc"].sum())
-    workload = float(g["_workload"].sum())
-
-    completion_rate = 100 * done / total if total else 0
-    known_done = ontime + late
-    ontime_rate = 100 * ontime / known_done if known_done else 0
-    score = 0.70 * completion_rate + 0.30 * ontime_rate
-
-    return g, {
-        "total": total, "done": done, "ontime": ontime, "late": late,
-        "overdue": overdue, "doing": doing, "stale": stale, "outside": outside,
-        "workload": workload, "completion_rate": completion_rate,
-        "ontime_rate": ontime_rate, "score": score,
-    }
-
-
-def staff_kpi(g: pd.DataFrame) -> pd.DataFrame:
-    rows = []
-    for staff, d in g.groupby("_assignee"):
-        total = len(d)
-        done = int(d["_done_asof"].sum())
-        ontime = int(d["_completed_on_time"].sum())
-        late = int(d["_completed_late"].sum())
-        overdue = int(d["_overdue"].sum())
-        doing = int(d["_doing"].sum())
-        stale = int(d["_late_update"].sum())
-        workload = float(d["_workload"].sum())
-        c_rate = 100 * done / total if total else 0
-        known = ontime + late
-        o_rate = 100 * ontime / known if known else 0
-        score = .70 * c_rate + .30 * o_rate
-        rows.append({
-            "Cán bộ": staff, "Tổng": total, "Done": done, "Đúng hạn": ontime,
-            "HT trễ": late, "Quá hạn": overdue, "Đang làm": doing,
-            "Update muộn": stale, "Workload": round(workload, 1),
-            "HT %": round(c_rate, 1), "Đúng hạn %": round(o_rate, 1), "BSC %": round(score, 1),
+        records.append({
+            "key": str(issue.get("key") or ""),
+            "summary": str(f.get("summary") or ""),
+            "assignee": str(assignee.get("displayName") or "(Chưa phân công)"),
+            "status": str(status.get("name") or ""),
+            "due": iso_date(f.get("duedate")),
+            "resolution": iso_date(f.get("resolutiondate")),
+            "created": iso_date(f.get("created")),
+            "updated": iso_date(f.get("updated")),
+            "labels": [str(x) for x in (f.get("labels") or [])],
+            "components": [
+                str(x.get("name") or "") for x in (f.get("components") or [])
+                if isinstance(x, dict) and x.get("name")
+            ],
+            "complexity": complexity,
+            "commentDate": comments["date"],
+            "commentAuthor": comments["author"],
+            "commentBody": comments["body"],
+            "url": base_url.rstrip("/") + "/browse/" + str(issue.get("key") or ""),
         })
-    return pd.DataFrame(rows).sort_values(["BSC %", "Workload"], ascending=[False, False])
 
-
-def period_mask(df, basis, start, end):
-    if basis == "Due date trong kỳ":
-        return df["_due"].between(start, end, inclusive="both")
-    if basis == "Hoàn thành trong kỳ":
-        return df["_resolution"].between(start, end, inclusive="both")
-    return df["_created"].between(start, end, inclusive="both")
-
-
-def pct_delta(cur, prev):
-    if prev == 0:
-        return None
-    return 100 * (cur - prev) / prev
-
-
-# ---------------------------------------------------------------------
-# CONFIG / DATA
-# ---------------------------------------------------------------------
-BASE_URL = secret("JIRA_BASE_URL")
-EMAIL = secret("JIRA_EMAIL")
-TOKEN = secret("JIRA_API_TOKEN")
-DEFAULT_QUERY = secret("JIRA_DEFAULT_JQL", DEFAULT_JQL)
-
-if not (BASE_URL and EMAIL and TOKEN):
-    st.error("Chưa có Jira Secrets. Vào Streamlit Cloud → App settings → Secrets và cấu hình JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN.")
-    st.stop()
-
-with st.sidebar:
-    st.markdown("### ⚙️ Cấu hình BSC")
-    jql = st.text_area("JQL", value=DEFAULT_QUERY, height=130)
-    done_text = st.text_input("Trạng thái hoàn thành", DONE_DEFAULT)
-    stale_days = st.number_input("Ngưỡng cập nhật muộn (ngày)", 1, 60, 7)
-    outside_text = st.text_input("Label ngoài BSC", "ngoai_bsc,outside_bsc")
-    st.caption("Complexity: Very Complex=5, Complex=4, Medium=3, Simple=2, Very Simple=1")
-    sync = st.button("🔄 Đồng bộ Jira", type="primary", use_container_width=True)
-    clear = st.button("🧹 Xóa cache phiên", use_container_width=True)
-
-if clear:
-    for k in ["jira_df", "jira_meta", "comment_cache"]:
-        st.session_state.pop(k, None)
-    st.rerun()
-
-if sync or "jira_df" not in st.session_state:
-    try:
-        with st.spinner("Đang đồng bộ dữ liệu từ Jira..."):
-            df, meta = load_jira(BASE_URL, EMAIL, TOKEN, jql)
-        st.session_state["jira_df"] = df
-        st.session_state["jira_meta"] = meta
-        st.session_state.setdefault("comment_cache", {})
-    except JiraApiError as exc:
-        st.error(str(exc))
-        st.stop()
-
-df = st.session_state["jira_df"].copy()
-meta = st.session_state["jira_meta"]
-
-if df.empty:
-    st.warning("JQL không trả về Task nào.")
-    st.stop()
-
-done_statuses = {x.strip().lower() for x in done_text.split(",") if x.strip()}
-outside_labels = {x.strip().lower() for x in outside_text.split(",") if x.strip()}
-
-
-# ---------------------------------------------------------------------
-# HERO / FILTERS
-# ---------------------------------------------------------------------
-st.markdown(f"""
-<div class="bsc-hero">
-  <div class="bsc-hero-title">BSC Executive Performance</div>
-  <div class="bsc-hero-sub">Jira BANCORE · Epic 7559 · Báo cáo hiệu suất quản trị theo Tháng / Quý / Năm</div>
-  <div class="bsc-live"><span class="bsc-dot"></span> Jira API · Đồng bộ {html.escape(meta.get("loaded_at",""))} · {html.escape(meta.get("user",""))}</div>
-</div>
-""", unsafe_allow_html=True)
-
-f1, f2, f3, f4 = st.columns([1, 1.15, 1.5, 1.3])
-with f1:
-    period_kind = st.selectbox("Kỳ báo cáo", ["Tháng", "Quý", "Năm"])
-with f4:
-    basis = st.selectbox("Căn cứ", ["Due date trong kỳ", "Hoàn thành trong kỳ", "Created trong kỳ"])
-
-basis_dates = df["_due"] if basis == "Due date trong kỳ" else df["_resolution"] if basis == "Hoàn thành trong kỳ" else df["_created"]
-opts = period_options(basis_dates, period_kind)
-
-with f2:
-    period_label = st.selectbox("Chọn kỳ", opts)
-with f3:
-    staff_filter = st.selectbox("Cán bộ", ["Tất cả cán bộ"] + sorted(df["_assignee"].dropna().unique().tolist()))
-
-start, end = period_bounds(period_kind, period_label)
-as_of = min(pd.Timestamp.now(), end)
-mask = period_mask(df, basis, start, end)
-period_raw = df[mask].copy()
-
-if period_raw.empty:
-    st.warning("Không có dữ liệu trong kỳ đã chọn.")
-    st.stop()
-
-# comment sync only for period
-with st.expander("💬 Dữ liệu Comment / tiến độ", expanded=False):
-    c1, c2 = st.columns([2.5, 1])
-    with c1:
-        st.caption("Nếu chưa đồng bộ Comment, dashboard dùng trường Updated làm dữ liệu thay thế cho độ tươi tiến độ.")
-    with c2:
-        refresh_comments = st.button("Đồng bộ Comment kỳ này", use_container_width=True)
-
-if refresh_comments:
-    with st.spinner(f"Đang đọc comment mới nhất của {len(period_raw)} Jira..."):
-        sync_comments(BASE_URL, EMAIL, TOKEN, period_raw["_key"].tolist(), force=True)
-
-period_raw = apply_comments(period_raw)
-period_df, metrics = calc_metrics(period_raw, as_of, done_statuses, stale_days, outside_labels)
-
-# Previous period for comparison
-pstart, pend = previous_bounds(period_kind, period_label)
-prev_raw = apply_comments(df[period_mask(df, basis, pstart, pend)].copy())
-_, prev_metrics = calc_metrics(prev_raw, min(pd.Timestamp.now(), pend), done_statuses, stale_days, outside_labels) if not prev_raw.empty else (prev_raw, {
-    "total":0,"done":0,"ontime":0,"late":0,"overdue":0,"doing":0,"stale":0,"outside":0,"workload":0,
-    "completion_rate":0,"ontime_rate":0,"score":0
-})
-
-if staff_filter != "Tất cả cán bộ":
-    period_df = period_df[period_df["_assignee"] == staff_filter].copy()
-    period_df, metrics = calc_metrics(period_df, as_of, done_statuses, stale_days, outside_labels)
-
-st.markdown(
-    f'<span class="bsc-period">BSC {html.escape(period_kind.upper())} {html.escape(period_label)}</span>',
-    unsafe_allow_html=True
-)
-
-
-# ---------------------------------------------------------------------
-# KPI CARDS
-# ---------------------------------------------------------------------
-d_total = pct_delta(metrics["total"], prev_metrics["total"])
-d_work = pct_delta(metrics["workload"], prev_metrics["workload"])
-d_score = metrics["score"] - prev_metrics["score"]
-
-def delta_text(v, suffix="%"):
-    if v is None:
-        return "Kỳ đầu"
-    sign = "+" if v >= 0 else ""
-    return f"{sign}{v:.1f}{suffix}"
-
-cards = [
-    kpi_card("Tổng công việc", f'{metrics["total"]:,}', "so với kỳ trước", "c-blue", "tasks", delta_text(d_total), "up" if (d_total or 0)>=0 else "down"),
-    kpi_card("Đã hoàn thành", f'{metrics["done"]:,}', f'{metrics["completion_rate"]:.1f}% tổng Task', "c-green", "done"),
-    kpi_card("Đúng hạn", f'{metrics["ontime"]:,}', f'{metrics["ontime_rate"]:.1f}% số Done', "c-teal", "time"),
-    kpi_card("Hoàn thành trễ", f'{metrics["late"]:,}', f'{100*metrics["late"]/metrics["total"] if metrics["total"] else 0:.1f}% tổng Task', "c-amber", "late"),
-    kpi_card("Quá hạn chưa Done", f'{metrics["overdue"]:,}', f'{100*metrics["overdue"]/metrics["total"] if metrics["total"] else 0:.1f}% cần xử lý', "c-red", "over"),
-    kpi_card("Đang thực hiện", f'{metrics["doing"]:,}', f'{100*metrics["doing"]/metrics["total"] if metrics["total"] else 0:.1f}% tổng Task', "c-violet", "doing"),
-    kpi_card("Cập nhật muộn", f'{metrics["stale"]:,}', f'quá {stale_days} ngày', "c-gold", "comment"),
-    kpi_card("Ngoài BSC", f'{metrics["outside"]:,}', "theo Labels", "c-cyan", "folder"),
-    kpi_card("Workload điểm", f'{metrics["workload"]:.0f}', "theo Complexity", "c-navy", "workload", delta_text(d_work), "up" if (d_work or 0)>=0 else "down"),
-    kpi_card("BSC hiệu suất", f'{metrics["score"]:.1f}%', "70% hoàn thành + 30% đúng hạn", "c-green", "star", delta_text(d_score, "đ"), "up" if d_score>=0 else "down"),
-]
-st.markdown('<div class="kpi-grid">' + ''.join(cards) + '</div>', unsafe_allow_html=True)
-
-
-# ---------------------------------------------------------------------
-# EXECUTIVE SUMMARY
-# ---------------------------------------------------------------------
-completion_gap = metrics["completion_rate"] - 90
-ontime_gap = metrics["ontime_rate"] - 90
-over_rate = 100 * metrics["overdue"] / metrics["total"] if metrics["total"] else 0
-over_gap = over_rate - 5
-
-def cls_gap(gap, inverse=False):
-    ok = gap <= 0 if inverse else gap >= 0
-    return "t-good" if ok else "t-bad"
-
-st.markdown(f"""
-<div class="exec-summary">
-  <div class="exec-intro"><b>Executive BSC Summary</b><p>Đánh giá nhanh mức đạt mục tiêu và các điểm cần can thiệp. Dashboard luôn hiển thị đồng thời số lượng tuyệt đối và tỷ lệ.</p></div>
-  <div class="exec-target"><span>Hoàn thành / mục tiêu</span><strong class="{cls_gap(completion_gap)}">{metrics["completion_rate"]:.1f}% / 90%</strong><small class="{cls_gap(completion_gap)}">{completion_gap:+.1f} điểm %</small></div>
-  <div class="exec-target"><span>Đúng hạn / mục tiêu</span><strong class="{cls_gap(ontime_gap)}">{metrics["ontime_rate"]:.1f}% / 90%</strong><small class="{cls_gap(ontime_gap)}">{ontime_gap:+.1f} điểm %</small></div>
-  <div class="exec-target"><span>Quá hạn / ngưỡng</span><strong class="{cls_gap(over_gap, True)}">{over_rate:.1f}% / ≤5%</strong><small class="{cls_gap(over_gap, True)}">{over_gap:+.1f} điểm %</small></div>
-  <div class="exec-target"><span>BSC tổng hợp</span><strong class="t-good">{metrics["score"]:.1f}%</strong><small class="{'t-good' if d_score>=0 else 't-bad'}">{d_score:+.1f} điểm kỳ trước</small></div>
-</div>
-""", unsafe_allow_html=True)
-
-
-# ---------------------------------------------------------------------
-# STAFF + STATUS
-# ---------------------------------------------------------------------
-st.markdown('<div class="section-title">Hiệu suất BSC theo cán bộ</div><div class="section-sub">Số lượng, tiến độ, đúng hạn, cập nhật và workload trong cùng một bảng.</div>', unsafe_allow_html=True)
-
-staff_df = staff_kpi(period_df)
-st.dataframe(
-    staff_df,
-    use_container_width=True,
-    hide_index=True,
-    column_config={
-        "BSC %": st.column_config.ProgressColumn("BSC %", min_value=0, max_value=100, format="%.1f%%"),
-        "HT %": st.column_config.NumberColumn("HT %", format="%.1f%%"),
-        "Đúng hạn %": st.column_config.NumberColumn("Đúng hạn %", format="%.1f%%"),
+    meta = {
+        "user": info.display_name,
+        "loadedAt": datetime.now().astimezone().strftime("%d/%m/%Y %H:%M:%S"),
+        "issueCount": len(records),
     }
-)
+    return records, meta
 
-c1, c2 = st.columns([1.4, 1])
-with c1:
-    result_counts = period_df["_result"].value_counts().reset_index()
-    result_counts.columns = ["Kết quả", "Số lượng"]
-    fig = px.pie(
-        result_counts, names="Kết quả", values="Số lượng", hole=.62,
-        color="Kết quả",
-        color_discrete_map={
-            "Hoàn thành đúng hạn":"#13966a",
-            "Hoàn thành trễ":"#d98b17",
-            "Quá hạn chưa xong":"#d94b57",
-            "Đang thực hiện":"#177ddc",
-            "Đã hoàn thành":"#7257b5",
-            "Khác":"#8fa0ad",
-        },
-        title="Cơ cấu trạng thái công việc"
-    )
-    fig.update_layout(margin=dict(l=10,r=10,t=55,b=10), legend_title="", height=400)
-    fig.update_traces(textinfo="label+value+percent")
-    st.plotly_chart(fig, use_container_width=True)
-with c2:
-    overdue_staff = period_df.groupby("_assignee")["_overdue"].sum().sort_values(ascending=True)
-    overdue_staff = overdue_staff[overdue_staff > 0].reset_index(name="Quá hạn")
-    if overdue_staff.empty:
-        st.success("Không có Task quá hạn trong kỳ.")
-    else:
-        fig = px.bar(
-            overdue_staff, x="Quá hạn", y="_assignee", orientation="h",
-            text="Quá hạn", title="Ranking quá hạn theo cán bộ",
-            color="Quá hạn", color_continuous_scale=["#f6c867","#d94b57"]
-        )
-        fig.update_layout(margin=dict(l=10,r=10,t=55,b=10), yaxis_title="", height=400, coloraxis_showscale=False)
-        st.plotly_chart(fig, use_container_width=True)
+try:
+    records, meta = load_jira_records()
+except JiraApiError as exc:
+    st.error(f"Lỗi kết nối Jira: {exc}")
+    st.stop()
 
+data_json = json.dumps(records, ensure_ascii=False).replace("</script>", "<\\/script>")
+meta_json = json.dumps(meta, ensure_ascii=False).replace("</script>", "<\\/script>")
 
-# ---------------------------------------------------------------------
-# DEEP ANALYTICS
-# ---------------------------------------------------------------------
-st.markdown('<div class="section-title">Phân tích phục vụ báo cáo Tháng / Quý / Năm</div><div class="section-sub">Xu hướng, aging, workload, comment và cơ cấu công việc.</div>', unsafe_allow_html=True)
+script = DYNAMIC_SCRIPT.replace("__DATA_JSON__", data_json).replace("__META_JSON__", meta_json)
+page = PREVIEW_HTML.replace("</body>", script + "\n</body>")
 
-tab1, tab2, tab3, tab4 = st.tabs(["📈 Xu hướng", "⚠️ Rủi ro", "🧩 Workload", "💬 Cập nhật"])
-
-with tab1:
-    year = start.year
-    ydf = df[df["_due"].dt.year == year].copy()
-    if not ydf.empty:
-        ydf = apply_comments(ydf)
-        trend_rows = []
-        for month in range(1, 13):
-            ms = pd.Timestamp(year=year, month=month, day=1)
-            me = ms + pd.offsets.MonthEnd(0) + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1)
-            md = ydf[ydf["_due"].between(ms, me)]
-            if md.empty:
-                trend_rows.append({"Tháng": f"T{month}", "Tổng": 0, "Hoàn thành": 0, "Đúng hạn": 0, "Quá hạn": 0})
-                continue
-            mg, mm = calc_metrics(md, min(pd.Timestamp.now(), me), done_statuses, stale_days, outside_labels)
-            trend_rows.append({"Tháng": f"T{month}", "Tổng": mm["total"], "Hoàn thành": mm["done"], "Đúng hạn": mm["ontime"], "Quá hạn": mm["overdue"]})
-        tdf = pd.DataFrame(trend_rows)
-        fig = px.line(
-            tdf, x="Tháng", y=["Tổng","Hoàn thành","Đúng hạn","Quá hạn"],
-            markers=True, title=f"Xu hướng công việc năm {year}",
-            color_discrete_map={"Tổng":"#285778","Hoàn thành":"#13966a","Đúng hạn":"#0e8fa1","Quá hạn":"#d94b57"}
-        )
-        fig.update_layout(height=430, legend_title="")
-        st.plotly_chart(fig, use_container_width=True)
-
-with tab2:
-    aging = pd.cut(
-        period_df.loc[period_df["_overdue"], "_days_late"],
-        bins=[0,3,7,14,np.inf],
-        labels=["1–3 ngày","4–7 ngày","8–14 ngày",">14 ngày"],
-        include_lowest=True
-    ).value_counts().reindex(["1–3 ngày","4–7 ngày","8–14 ngày",">14 ngày"], fill_value=0).reset_index()
-    aging.columns = ["Nhóm chậm", "Số Task"]
-    a1, a2 = st.columns([1.2,1])
-    with a1:
-        fig = px.bar(aging, x="Nhóm chậm", y="Số Task", text="Số Task", title="Aging Task quá hạn", color="Số Task", color_continuous_scale=["#f6c867","#d94b57"])
-        fig.update_layout(height=360, coloraxis_showscale=False)
-        st.plotly_chart(fig, use_container_width=True)
-    with a2:
-        top_late = period_df[period_df["_overdue"] | period_df["_completed_late"]].sort_values("_days_late", ascending=False).head(10)
-        st.dataframe(
-            pd.DataFrame({
-                "Issue": top_late["_key"],
-                "Cán bộ": top_late["_assignee"],
-                "Due": top_late["_due"].map(fmt_date),
-                "Kết quả": top_late["_result"],
-                "Chậm (ngày)": top_late["_days_late"].astype(int),
-            }),
-            hide_index=True, use_container_width=True
-        )
-
-with tab3:
-    w1, w2 = st.columns(2)
-    with w1:
-        comp = period_df["_complexity"].value_counts().reset_index()
-        comp.columns = ["Complexity","Số Task"]
-        fig = px.bar(comp, x="Số Task", y="Complexity", orientation="h", text="Số Task", title="Phân bổ Complexity", color="Số Task", color_continuous_scale=["#8bc5e8","#285778"])
-        fig.update_layout(height=390, coloraxis_showscale=False)
-        st.plotly_chart(fig, use_container_width=True)
-    with w2:
-        work = period_df.groupby("_assignee")["_workload"].sum().sort_values().reset_index(name="Workload")
-        fig = px.bar(work, x="Workload", y="_assignee", orientation="h", text="Workload", title="Workload điểm theo cán bộ", color="Workload", color_continuous_scale=["#9fe0d2","#13966a"])
-        fig.update_layout(height=390, coloraxis_showscale=False, yaxis_title="")
-        st.plotly_chart(fig, use_container_width=True)
-
-    # Components
-    comps = period_df["_components"].fillna("").str.split("; ").explode()
-    comps = comps[comps.str.strip() != ""].value_counts().head(12).reset_index()
-    comps.columns = ["Component","Số Task"]
-    if not comps.empty:
-        fig = px.bar(comps, x="Component", y="Số Task", text="Số Task", title="Top Component theo số lượng Task", color="Số Task", color_continuous_scale=["#b9d8f3","#177ddc"])
-        fig.update_layout(height=380, coloraxis_showscale=False)
-        st.plotly_chart(fig, use_container_width=True)
-
-with tab4:
-    fresh = pd.cut(
-        period_df["_freshness_days"],
-        bins=[-np.inf,3,7,14,np.inf],
-        labels=["≤3 ngày","4–7 ngày","8–14 ngày",">14 ngày"]
-    ).value_counts().reindex(["≤3 ngày","4–7 ngày","8–14 ngày",">14 ngày"], fill_value=0).reset_index()
-    fresh.columns = ["Độ tươi cập nhật","Số Task"]
-    f1, f2 = st.columns([1.2,1])
-    with f1:
-        fig = px.bar(fresh, x="Độ tươi cập nhật", y="Số Task", text="Số Task", title="Độ tươi Comment / Updated", color="Độ tươi cập nhật",
-                     color_discrete_map={"≤3 ngày":"#13966a","4–7 ngày":"#0e8fa1","8–14 ngày":"#d98b17",">14 ngày":"#d94b57"})
-        fig.update_layout(height=360, showlegend=False)
-        st.plotly_chart(fig, use_container_width=True)
-    with f2:
-        stale_staff = period_df.groupby("_assignee")["_late_update"].sum().sort_values(ascending=False).reset_index(name="Update muộn")
-        stale_staff = stale_staff[stale_staff["Update muộn"] > 0]
-        if stale_staff.empty:
-            st.success("Không có cán bộ nào có Task cập nhật muộn.")
-        else:
-            st.dataframe(stale_staff, hide_index=True, use_container_width=True)
-
-
-# ---------------------------------------------------------------------
-# MANAGEMENT ATTENTION
-# ---------------------------------------------------------------------
-st.markdown('<div class="section-title">Management Attention</div><div class="section-sub">Tự động nêu các điểm cần đưa vào báo cáo quản trị.</div>', unsafe_allow_html=True)
-a1, a2, a3 = st.columns(3)
-with a1:
-    st.markdown(f'<div class="attention red"><b>⚠ {metrics["overdue"]} Task đang quá hạn</b><p>{int((period_df["_days_late"]>7).sum())} Task chậm trên 7 ngày. Cần xác định nguyên nhân và kế hoạch xử lý.</p></div>', unsafe_allow_html=True)
-with a2:
-    st.markdown(f'<div class="attention amber"><b>💬 {metrics["stale"]} Task cập nhật muộn</b><p>Các Task chưa có Comment/Updated trong hơn {stale_days} ngày cần được cập nhật tiến độ.</p></div>', unsafe_allow_html=True)
-with a3:
-    st.markdown(f'<div class="attention blue"><b>▥ Workload {metrics["workload"]:.0f} điểm</b><p>Đánh giá đồng thời số Task và Complexity để tránh thiên lệch do chỉ đếm số lượng.</p></div>', unsafe_allow_html=True)
-
-
-# ---------------------------------------------------------------------
-# DETAIL DRILL-DOWN
-# ---------------------------------------------------------------------
-st.markdown('<div class="section-title">Drill-down Jira chi tiết</div><div class="section-sub">Lọc trực tiếp từng nhóm vấn đề để đưa vào báo cáo hoặc mở lại Jira.</div>', unsafe_allow_html=True)
-
-d1, d2, d3 = st.columns([1.3,1.3,2])
-with d1:
-    detail_staff = st.selectbox("Cán bộ chi tiết", ["Tất cả"] + sorted(period_df["_assignee"].unique().tolist()), key="detail_staff")
-with d2:
-    detail_kind = st.selectbox("Nhóm công việc", ["Tất cả","Hoàn thành đúng hạn","Hoàn thành trễ","Quá hạn chưa xong","Đang thực hiện","Cập nhật muộn","Ngoài BSC"])
-with d3:
-    q = st.text_input("Tìm Issue / Summary / Component / Label")
-
-detail = period_df.copy()
-if detail_staff != "Tất cả":
-    detail = detail[detail["_assignee"] == detail_staff]
-if detail_kind == "Cập nhật muộn":
-    detail = detail[detail["_late_update"]]
-elif detail_kind == "Ngoài BSC":
-    detail = detail[detail["_outside_bsc"]]
-elif detail_kind != "Tất cả":
-    detail = detail[detail["_result"] == detail_kind]
-if q.strip():
-    pat = re.escape(q.strip())
-    detail = detail[
-        detail["_key"].str.contains(pat, case=False, na=False)
-        | detail["_summary"].str.contains(pat, case=False, na=False)
-        | detail["_components"].str.contains(pat, case=False, na=False)
-        | detail["_labels"].str.contains(pat, case=False, na=False)
-    ]
-
-out = pd.DataFrame({
-    "Issue": detail["_key"],
-    "Summary": detail["_summary"],
-    "Cán bộ": detail["_assignee"],
-    "Complexity": detail["_complexity"],
-    "Component": detail["_components"],
-    "Labels": detail["_labels"],
-    "Due date": detail["_due"].map(fmt_date),
-    "Resolution": detail["_resolution"].map(fmt_date),
-    "Status": detail["_status"],
-    "Kết quả": detail["_result"],
-    "Chậm (ngày)": detail["_days_late"].fillna(0).astype(int),
-    "Comment gần nhất": detail["_last_comment"].map(fmt_date),
-    "Người comment": detail["_last_comment_author"],
-    "Nội dung cập nhật": detail["_last_comment_text"].str.slice(0, 250),
-    "Mở Jira": BASE_URL.rstrip("/") + "/browse/" + detail["_key"],
-})
-
-st.dataframe(
-    out,
-    use_container_width=True,
-    hide_index=True,
-    column_config={
-        "Mở Jira": st.column_config.LinkColumn("Mở Jira", display_text="Mở"),
-        "Nội dung cập nhật": st.column_config.TextColumn(width="large"),
-    }
-)
-
-st.download_button(
-    "⬇️ Tải dữ liệu chi tiết đang lọc",
-    out.to_csv(index=False).encode("utf-8-sig"),
-    file_name=f"BSC_Jira_{period_kind}_{period_label}.csv",
-    mime="text/csv"
-)
-
-st.caption(f"Jira BSC Executive Dashboard V{APP_VERSION} · Không có chức năng Upload CSV · Dữ liệu lấy trực tiếp từ Jira API.")
+components.html(page, height=2550, scrolling=True)
