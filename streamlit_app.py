@@ -1,5 +1,7 @@
+
 from __future__ import annotations
 
+import html
 import os
 import re
 from datetime import datetime
@@ -8,77 +10,121 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 from jira_client import JiraApiError, JiraClient
 
 
-APP_VERSION = "5.0-streamlit-cloud"
-DEFAULT_URL = ""
+APP_VERSION = "6.0"
 DEFAULT_JQL = 'project = "BANCORE" AND parentEpic IN (BANCORE-7559) AND issuetype = Task ORDER BY duedate ASC'
 DONE_DEFAULT = "Done, Closed, Resolved"
-
+COMPLEXITY_WEIGHT = {
+    "Very Complex": 5,
+    "Complex": 4,
+    "Medium": 3,
+    "Simple": 2,
+    "Very Simple": 1,
+    "Không phân loại": 1,
+}
 
 st.set_page_config(
-    page_title="BSC - Báo cáo hiệu suất đội nhóm",
+    page_title="Jira BSC Executive Dashboard",
     page_icon="📊",
     layout="wide",
+    initial_sidebar_state="collapsed",
 )
 
-st.markdown(
-    """
-    <style>
-      .block-container {padding-top: 1.0rem; padding-bottom: 2rem;}
-      div[data-testid="stMetric"] {background:#fff;border:1px solid #e9e9e9;padding:10px 14px;border-radius:10px;}
-      .status-ok {padding:8px 10px;border:1px solid #d8eee0;border-radius:8px;background:#f5fff8;}
-      .small-note {font-size:.86rem;color:#666;}
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+# ---------------------------------------------------------------------
+# STYLE
+# ---------------------------------------------------------------------
+st.markdown("""
+<style>
+:root{
+  --navy:#0b1f33; --navy2:#123f64; --blue:#177ddc; --cyan:#11a7b8;
+  --green:#13966a; --amber:#d98b17; --red:#d94b57; --violet:#7257b5;
+  --bg:#f4f7fb; --card:#fff; --line:#e5edf4; --text:#173249; --muted:#7b91a4;
+}
+html,body,[data-testid="stAppViewContainer"]{background:#f4f7fb}
+[data-testid="stHeader"]{background:transparent}
+.block-container{max-width:1600px;padding-top:1rem;padding-bottom:2rem}
+.bsc-hero{
+  background:linear-gradient(118deg,#071c31 0%,#0d3d61 43%,#0a7897 76%,#17a184 100%);
+  color:white;border-radius:24px;padding:22px 24px;box-shadow:0 18px 50px rgba(11,31,51,.18);
+  position:relative;overflow:hidden;margin-bottom:14px;
+}
+.bsc-hero:after{content:"";position:absolute;width:360px;height:360px;border-radius:50%;background:rgba(255,255,255,.07);right:-100px;top:-180px}
+.bsc-hero-title{font-size:29px;font-weight:900;letter-spacing:-.03em;position:relative;z-index:1}
+.bsc-hero-sub{font-size:13px;color:#d8eef5;margin-top:7px;position:relative;z-index:1}
+.bsc-live{display:inline-flex;align-items:center;gap:8px;margin-top:13px;padding:7px 10px;border:1px solid rgba(255,255,255,.20);background:rgba(255,255,255,.10);border-radius:999px;font-size:11px;font-weight:750;position:relative;z-index:1}
+.bsc-dot{width:8px;height:8px;background:#67f0ad;border-radius:50%;box-shadow:0 0 0 5px rgba(103,240,173,.14)}
+.bsc-period{display:inline-block;background:white;color:#0a5673;padding:7px 11px;border-radius:999px;font-size:11px;font-weight:900;margin-left:7px}
+.kpi-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:14px 0}
+.kpi-card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:14px;box-shadow:0 7px 24px rgba(20,54,83,.05);min-width:0}
+.kpi-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.kpi-label{font-size:11px;font-weight:800;color:#71869a}
+.kpi-icon{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;background:var(--soft);color:var(--c)}
+.kpi-icon svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9}
+.kpi-value{font-size:29px;font-weight:950;letter-spacing:-.04em;color:var(--c);margin-top:8px}
+.kpi-meta{font-size:10px;color:#8a9bab;margin-top:6px}
+.delta{display:inline-block;padding:3px 6px;border-radius:999px;font-weight:850;margin-right:4px}
+.delta-up{background:#e8f8ef;color:#15804e}.delta-down{background:#ffecee;color:#c13f4c}.delta-neutral{background:#edf4fb;color:#316b9d}
+.c-blue{--c:#177ddc;--soft:#eaf4ff}.c-green{--c:#13966a;--soft:#e9f8ef}.c-teal{--c:#0e8fa1;--soft:#e7f7f8}
+.c-amber{--c:#d98b17;--soft:#fff4e4}.c-red{--c:#d94b57;--soft:#ffedef}.c-violet{--c:#7257b5;--soft:#f1ecfb}
+.c-navy{--c:#285778;--soft:#eaf0f6}.c-cyan{--c:#158ab8;--soft:#e9f7fc}.c-gold{--c:#a97812;--soft:#fff7df}
+.exec-summary{background:white;border:1px solid var(--line);border-radius:18px;padding:14px;display:grid;grid-template-columns:1.35fr repeat(4,1fr);gap:10px;box-shadow:0 7px 22px rgba(22,48,75,.04);margin-bottom:14px}
+.exec-intro{padding:3px 7px}.exec-intro b{font-size:14px}.exec-intro p{margin:5px 0 0;font-size:10px;line-height:1.45;color:var(--muted)}
+.exec-target{border-left:1px solid #e8eef3;padding-left:12px}.exec-target span{font-size:9px;color:#7f93a5}.exec-target strong{display:block;font-size:20px;margin-top:4px}.exec-target small{font-size:9px;font-weight:800}
+.t-good{color:#13966a}.t-warn{color:#d98b17}.t-bad{color:#d94b57}
+.section-title{font-size:17px;font-weight:900;color:#17354c;margin:8px 0 2px}.section-sub{font-size:11px;color:#879aaa;margin-bottom:10px}
+[data-testid="stDataFrame"]{background:white;border:1px solid #e6edf3;border-radius:16px;padding:5px;box-shadow:0 7px 24px rgba(19,48,75,.04)}
+div[data-testid="stPlotlyChart"]{background:white;border:1px solid #e6edf3;border-radius:18px;padding:8px;box-shadow:0 7px 24px rgba(19,48,75,.04)}
+div[data-testid="stExpander"]{background:white;border-radius:14px;border:1px solid #e6edf3}
+[data-testid="stSidebar"]{background:#f8fbfd}
+.stButton>button,.stDownloadButton>button{border-radius:10px;font-weight:800}
+.attention{border-radius:14px;padding:12px 13px;border:1px solid #e9eef3;background:white;margin:6px 0}
+.attention.red{border-left:4px solid #d94b57}.attention.amber{border-left:4px solid #d98b17}.attention.blue{border-left:4px solid #177ddc}
+.attention b{font-size:12px}.attention p{font-size:10px;color:#7b91a4;margin:4px 0 0}
+@media(max-width:1200px){.kpi-grid{grid-template-columns:repeat(3,1fr)}.exec-summary{grid-template-columns:1fr 1fr 1fr}.exec-intro{grid-column:1/-1}}
+@media(max-width:700px){.kpi-grid{grid-template-columns:1fr 1fr}.exec-summary{grid-template-columns:1fr 1fr}}
+@media(max-width:450px){.kpi-grid,.exec-summary{grid-template-columns:1fr}.bsc-hero-title{font-size:23px}}
+</style>
+""", unsafe_allow_html=True)
 
 
-# -----------------------------------------------------------------------------
-# Helpers
-# -----------------------------------------------------------------------------
-def secret_or_env(name: str, default: str = "") -> str:
+# ---------------------------------------------------------------------
+# HELPERS
+# ---------------------------------------------------------------------
+def secret(name: str, default: str = "") -> str:
     env = os.getenv(name)
     if env:
         return env
     try:
-        value = st.secrets.get(name, default)
-        return str(value) if value is not None else default
+        return str(st.secrets.get(name, default) or default)
     except Exception:
         return default
 
 
-def value_text(value: Any) -> str:
+def txt(value: Any) -> str:
     if value is None:
         return ""
     if isinstance(value, str):
         return value
-    if isinstance(value, (int, float, bool)):
-        return str(value)
     if isinstance(value, list):
-        return "; ".join(x for x in (value_text(v) for v in value) if x)
+        return "; ".join(txt(v) for v in value if txt(v))
     if isinstance(value, dict):
-        for key in ("value", "name", "displayName", "key", "id"):
-            if value.get(key) not in (None, ""):
-                return str(value[key])
-        return str(value)
+        for k in ("value", "name", "displayName", "key", "id"):
+            if value.get(k) not in (None, ""):
+                return str(value[k])
     return str(value)
 
 
-def parse_dates(series: pd.Series) -> pd.Series:
-    if series is None:
-        return pd.Series(dtype="datetime64[ns]")
-    # Jira Cloud timestamps include timezone. Normalize to Vietnam time and remove tz.
-    raw = series.replace({"": None})
-    out = pd.to_datetime(raw, errors="coerce", utc=True)
+def parse_dates(s: pd.Series) -> pd.Series:
+    out = pd.to_datetime(s.replace({"": None}), errors="coerce", utc=True)
     try:
         return out.dt.tz_convert("Asia/Ho_Chi_Minh").dt.tz_localize(None)
     except Exception:
-        return pd.to_datetime(raw, errors="coerce")
+        return pd.to_datetime(s, errors="coerce")
 
 
 def fmt_date(x: Any) -> str:
@@ -87,71 +133,34 @@ def fmt_date(x: Any) -> str:
     return pd.Timestamp(x).strftime("%d/%m/%Y")
 
 
-def period_bounds(kind: str, label: str) -> tuple[pd.Timestamp, pd.Timestamp]:
-    freq = "M" if kind == "Tháng" else "Q" if kind == "Quý" else "Y"
-    p = pd.Period(label, freq=freq)
-    return p.start_time.normalize(), p.end_time.normalize() + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1)
+def field_value(fields: dict[str, Any], fid: str | None) -> Any:
+    return fields.get(fid) if fid else None
 
 
-def period_options(dates: pd.Series, kind: str) -> list[str]:
-    d = dates.dropna()
-    freq = "M" if kind == "Tháng" else "Q" if kind == "Quý" else "Y"
-    if d.empty:
-        return [str(pd.Timestamp.now().to_period(freq))]
-    return sorted({str(x) for x in d.dt.to_period(freq)}, reverse=True)
-
-
-def selected_point(chart_state):
-    try:
-        points = chart_state.selection.points
-    except Exception:
-        try:
-            points = chart_state.get("selection", {}).get("points", [])
-        except Exception:
-            points = []
-    return points[0] if points else None
-
-
-def field_value(fields: dict[str, Any], field_id: str | None) -> Any:
-    return fields.get(field_id) if field_id else None
-
-
-def issues_to_df(
-    issues: list[dict[str, Any]],
-    *,
-    complexity_id: str | None,
-    epic_link_id: str | None,
-) -> pd.DataFrame:
-    rows: list[dict[str, Any]] = []
+def issues_to_df(issues, complexity_id=None, epic_id=None):
+    rows = []
     for issue in issues:
         f = issue.get("fields") or {}
         assignee = f.get("assignee") or {}
         status = f.get("status") or {}
-        issue_type = f.get("issuetype") or {}
-        components = f.get("components") or []
+        itype = f.get("issuetype") or {}
+        comps = f.get("components") or []
         parent = f.get("parent") or {}
-        labels = f.get("labels") or []
-        epic_val = field_value(f, epic_link_id)
-        parent_text = value_text(parent) or value_text(epic_val)
-
         rows.append({
             "_key": str(issue.get("key") or ""),
-            "_id": str(issue.get("id") or ""),
             "_summary": str(f.get("summary") or ""),
             "_assignee": str(assignee.get("displayName") or "(Chưa phân công)"),
-            "_assignee_id": str(assignee.get("accountId") or ""),
             "_status": str(status.get("name") or ""),
-            "_issue_type": str(issue_type.get("name") or ""),
+            "_issue_type": str(itype.get("name") or ""),
             "_due_raw": f.get("duedate"),
             "_resolution_raw": f.get("resolutiondate"),
             "_created_raw": f.get("created"),
             "_updated_raw": f.get("updated"),
-            "_labels": "; ".join(str(x) for x in labels),
-            "_components": "; ".join(str(x.get("name") or "") for x in components if isinstance(x, dict)),
-            "_complexity": value_text(field_value(f, complexity_id)) or "Không phân loại",
-            "_parent": parent_text,
+            "_labels": "; ".join(str(x) for x in (f.get("labels") or [])),
+            "_components": "; ".join(str(x.get("name") or "") for x in comps if isinstance(x, dict)),
+            "_complexity": txt(field_value(f, complexity_id)) or "Không phân loại",
+            "_parent": txt(parent) or txt(field_value(f, epic_id)),
         })
-
     df = pd.DataFrame(rows)
     if df.empty:
         return df
@@ -162,578 +171,617 @@ def issues_to_df(
         ("_updated_raw", "_updated"),
     ]:
         df[dest] = parse_dates(df[raw])
-    # Jira Due date is a calendar deadline. Treat the whole due date as on-time,
-    # not only 00:00 at the beginning of that day.
+    # Due date là hạn hết ngày
     df["_due"] = df["_due"].dt.normalize() + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1)
     return df
 
 
-def make_client(base_url: str, email: str, token: str) -> JiraClient:
-    return JiraClient(base_url, email, token, timeout=45, verify_ssl=True)
-
-
-def load_from_jira(client: JiraClient, jql: str) -> tuple[pd.DataFrame, dict[str, Any]]:
+def load_jira(base_url: str, email: str, token: str, jql: str):
+    client = JiraClient(base_url, email, token)
+    info = client.test_connection()
     catalog = client.get_fields()
     complexity_id = client.resolve_field_id(catalog, ["Complexity", "Độ phức tạp", "Do phuc tap"])
-    epic_link_id = client.resolve_field_id(catalog, ["Epic Link", "Parent Epic", "Parent Link"])
+    epic_id = client.resolve_field_id(catalog, ["Epic Link", "Parent Epic", "Parent Link"])
 
-    wanted = [
+    fields = [
         "summary", "assignee", "status", "issuetype", "duedate",
         "resolutiondate", "created", "updated", "labels", "components", "parent",
     ]
-    for field_id in (complexity_id, epic_link_id):
-        if field_id and field_id not in wanted:
-            wanted.append(field_id)
+    for fid in (complexity_id, epic_id):
+        if fid and fid not in fields:
+            fields.append(fid)
 
-    issues = client.search_issues(jql, wanted, page_size=100, max_issues=10000)
-    df = issues_to_df(issues, complexity_id=complexity_id, epic_link_id=epic_link_id)
-    meta = {
-        "count": len(issues),
-        "complexity_id": complexity_id,
-        "epic_link_id": epic_link_id,
-        "fields_count": len(catalog),
+    issues = client.search_issues(jql, fields, page_size=100, max_issues=10000)
+    return issues_to_df(issues, complexity_id, epic_id), {
+        "user": info.display_name,
         "loaded_at": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+        "complexity_id": complexity_id,
+        "epic_id": epic_id,
     }
-    return df, meta
 
 
-def sync_comments_for_keys(client: JiraClient, keys: list[str], force: bool = False) -> tuple[int, int]:
+def sync_comments(base_url, email, token, keys, force=False):
     cache = st.session_state.setdefault("comment_cache", {})
-    need = keys if force else [k for k in keys if k not in cache]
+    need = list(keys) if force else [k for k in keys if k not in cache]
     if not need:
-        return 0, 0
-    fetched = client.latest_comments_bulk(need, workers=8)
-    cache.update(fetched)
-    errors = sum(1 for v in fetched.values() if isinstance(v, dict) and v.get("error"))
-    return len(fetched), errors
+        return
+    client = JiraClient(base_url, email, token)
+    cache.update(client.latest_comments_bulk(need, workers=8))
 
 
-def apply_comment_cache(df: pd.DataFrame) -> pd.DataFrame:
+def apply_comments(df: pd.DataFrame) -> pd.DataFrame:
     cache = st.session_state.get("comment_cache", {})
     out = df.copy()
-    created = []
-    authors = []
-    texts = []
-    errors = []
-    for key in out["_key"].tolist():
+    dates, authors, bodies, known = [], [], [], []
+    for key in out["_key"]:
+        in_cache = key in cache
         c = cache.get(key)
-        if not c or c.get("error"):
-            created.append(None)
-            authors.append("")
-            texts.append("")
-            errors.append(c.get("error", "") if isinstance(c, dict) else "")
+        if not in_cache or (isinstance(c, dict) and c.get("error")):
+            dates.append(None); authors.append(""); bodies.append(""); known.append(False)
+        elif c is None:
+            # Đã gọi API và Jira xác nhận issue không có comment.
+            dates.append(None); authors.append(""); bodies.append(""); known.append(True)
         else:
-            created.append(c.get("created"))
-            authors.append(str(c.get("author") or ""))
-            texts.append(str(c.get("body") or ""))
-            errors.append("")
-    out["_last_comment"] = parse_dates(pd.Series(created, index=out.index))
+            dates.append(c.get("created"))
+            authors.append(c.get("author", ""))
+            bodies.append(c.get("body", ""))
+            known.append(True)
+    out["_last_comment"] = parse_dates(pd.Series(dates, index=out.index))
     out["_last_comment_author"] = authors
-    out["_last_comment_text"] = texts
-    out["_comment_error"] = errors
-    out["_comment_known"] = [bool(cache.get(k) is not None and not (isinstance(cache.get(k), dict) and cache.get(k).get("error"))) for k in out["_key"].tolist()]
+    out["_last_comment_text"] = bodies
+    out["_comment_known"] = known
     return out
 
 
-def build_kpi(data: pd.DataFrame, w_complete: int, w_ontime: int) -> pd.DataFrame:
+def period_bounds(kind: str, label: str):
+    freq = {"Tháng": "M", "Quý": "Q", "Năm": "Y"}[kind]
+    p = pd.Period(label, freq=freq)
+    return p.start_time.normalize(), p.end_time.normalize() + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1)
+
+
+def period_options(dates: pd.Series, kind: str):
+    freq = {"Tháng": "M", "Quý": "Q", "Năm": "Y"}[kind]
+    d = dates.dropna()
+    if d.empty:
+        return [str(pd.Timestamp.now().to_period(freq))]
+    return sorted({str(x) for x in d.dt.to_period(freq)}, reverse=True)
+
+
+def previous_bounds(kind: str, label: str):
+    freq = {"Tháng": "M", "Quý": "Q", "Năm": "Y"}[kind]
+    p = pd.Period(label, freq=freq) - 1
+    return p.start_time.normalize(), p.end_time.normalize() + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1)
+
+
+def icon_svg(name: str) -> str:
+    icons = {
+        "tasks": '<svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>',
+        "done": '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16.5 8"/></svg>',
+        "time": '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+        "late": '<svg viewBox="0 0 24 24"><path d="M5 18 18 5M10 5h8v8"/></svg>',
+        "over": '<svg viewBox="0 0 24 24"><path d="M12 3 2.5 20h19L12 3Z"/><path d="M12 9v5M12 17h.01"/></svg>',
+        "doing": '<svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 3-6"/><path d="M4 4v5h5"/></svg>',
+        "comment": '<svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4V5Z"/><path d="M8 9h8M8 12h5"/></svg>',
+        "folder": '<svg viewBox="0 0 24 24"><path d="M4 6h7l2 3h7v9H4V6Z"/></svg>',
+        "workload": '<svg viewBox="0 0 24 24"><path d="M5 18V9M12 18V5M19 18v-7"/></svg>',
+        "star": '<svg viewBox="0 0 24 24"><path d="m12 3 2.5 5 5.5.8-4 3.9.9 5.5-4.9-2.6-4.9 2.6.9-5.5-4-3.9 5.5-.8L12 3Z"/></svg>',
+    }
+    return icons[name]
+
+
+def kpi_card(label, value, meta, css, icon, delta=None, delta_kind="neutral"):
+    delta_html = ""
+    if delta is not None:
+        cls = {"up": "delta-up", "down": "delta-down", "neutral": "delta-neutral"}[delta_kind]
+        delta_html = f'<span class="delta {cls}">{html.escape(str(delta))}</span>'
+    return f"""
+    <div class="kpi-card {css}">
+      <div class="kpi-top"><span class="kpi-label">{html.escape(label)}</span><span class="kpi-icon">{icon_svg(icon)}</span></div>
+      <div class="kpi-value">{html.escape(str(value))}</div>
+      <div class="kpi-meta">{delta_html}{meta}</div>
+    </div>
+    """
+
+
+def calc_metrics(data: pd.DataFrame, as_of: pd.Timestamp, done_statuses, stale_days, outside_labels):
+    g = data.copy()
+    current_done = g["_status"].str.lower().isin(done_statuses)
+    done_asof = g["_resolution"].notna() & (g["_resolution"] <= as_of)
+    done_asof |= current_done & g["_resolution"].isna()
+
+    g["_done_asof"] = done_asof
+    g["_completed_on_time"] = done_asof & g["_resolution"].notna() & g["_due"].notna() & (g["_resolution"] <= g["_due"])
+    g["_completed_late"] = done_asof & g["_resolution"].notna() & g["_due"].notna() & (g["_resolution"] > g["_due"])
+    g["_overdue"] = (~done_asof) & g["_due"].notna() & (g["_due"] < as_of)
+    g["_doing"] = (~done_asof) & ~g["_overdue"]
+
+    g["_days_since_comment"] = (as_of.normalize() - g["_last_comment"].dt.normalize()).dt.days
+    g["_days_since_update"] = (as_of.normalize() - g["_updated"].dt.normalize()).dt.days
+
+    # Nếu đã đọc comment: dùng comment; chưa đọc comment: dùng Updated làm proxy.
+    freshness_days = g["_days_since_update"].copy()
+    freshness_days.loc[g["_comment_known"]] = g.loc[g["_comment_known"], "_days_since_comment"]
+    g["_freshness_days"] = freshness_days
+    g["_late_update"] = (~done_asof) & (freshness_days > stale_days)
+
+    labels = g["_labels"].fillna("").str.lower()
+    g["_outside_bsc"] = False
+    for lab in outside_labels:
+        g["_outside_bsc"] |= labels.str.contains(re.escape(lab), na=False)
+
+    g["_weight"] = g["_complexity"].map(COMPLEXITY_WEIGHT).fillna(1).astype(float)
+    g["_workload"] = g["_weight"]
+
+    g["_result"] = np.select(
+        [g["_completed_on_time"], g["_completed_late"], g["_overdue"], g["_doing"], g["_done_asof"]],
+        ["Hoàn thành đúng hạn", "Hoàn thành trễ", "Quá hạn chưa xong", "Đang thực hiện", "Đã hoàn thành"],
+        default="Khác",
+    )
+    g["_days_late"] = np.where(
+        g["_completed_late"],
+        (g["_resolution"].dt.normalize() - g["_due"].dt.normalize()).dt.days,
+        np.where(g["_overdue"], (as_of.normalize() - g["_due"].dt.normalize()).dt.days, 0),
+    )
+
+    total = len(g)
+    done = int(g["_done_asof"].sum())
+    ontime = int(g["_completed_on_time"].sum())
+    late = int(g["_completed_late"].sum())
+    overdue = int(g["_overdue"].sum())
+    doing = int(g["_doing"].sum())
+    stale = int(g["_late_update"].sum())
+    outside = int(g["_outside_bsc"].sum())
+    workload = float(g["_workload"].sum())
+
+    completion_rate = 100 * done / total if total else 0
+    known_done = ontime + late
+    ontime_rate = 100 * ontime / known_done if known_done else 0
+    score = 0.70 * completion_rate + 0.30 * ontime_rate
+
+    return g, {
+        "total": total, "done": done, "ontime": ontime, "late": late,
+        "overdue": overdue, "doing": doing, "stale": stale, "outside": outside,
+        "workload": workload, "completion_rate": completion_rate,
+        "ontime_rate": ontime_rate, "score": score,
+    }
+
+
+def staff_kpi(g: pd.DataFrame) -> pd.DataFrame:
     rows = []
-    for assignee, g in data.groupby("_assignee", dropna=False):
-        total = len(g)
-        done = int(g["_done_asof"].sum())
-        ontime = int(g["_completed_on_time"].sum())
-        late = int(g["_completed_late"].sum())
-        overdue = int(g["_overdue"].sum())
-        stale = int(g["_late_update"].sum())
-        outside = int(g["_outside_bsc"].sum())
-        known = int((g["_completed_on_time"] | g["_completed_late"]).sum())
-        completion_rate = 100 * done / total if total else 0
-        ontime_rate = 100 * ontime / known if known else (100 if done > 0 and overdue == 0 else 0)
-        score = (w_complete * completion_rate + w_ontime * ontime_rate) / 100
+    for staff, d in g.groupby("_assignee"):
+        total = len(d)
+        done = int(d["_done_asof"].sum())
+        ontime = int(d["_completed_on_time"].sum())
+        late = int(d["_completed_late"].sum())
+        overdue = int(d["_overdue"].sum())
+        doing = int(d["_doing"].sum())
+        stale = int(d["_late_update"].sum())
+        workload = float(d["_workload"].sum())
+        c_rate = 100 * done / total if total else 0
+        known = ontime + late
+        o_rate = 100 * ontime / known if known else 0
+        score = .70 * c_rate + .30 * o_rate
         rows.append({
-            "Cán bộ": assignee,
-            "Công việc": total,
-            "Hoàn thành": done,
-            "Đúng hạn": ontime,
-            "Hoàn thành trễ": late,
-            "Quá hạn": overdue,
-            "Cập nhật muộn": stale,
-            "Ngoài BSC": outside,
-            "Hoàn thành (%)": round(completion_rate, 1),
-            "Đúng hạn (%)": round(ontime_rate, 1),
-            "Hiệu suất (%)": round(score, 1),
+            "Cán bộ": staff, "Tổng": total, "Done": done, "Đúng hạn": ontime,
+            "HT trễ": late, "Quá hạn": overdue, "Đang làm": doing,
+            "Update muộn": stale, "Workload": round(workload, 1),
+            "HT %": round(c_rate, 1), "Đúng hạn %": round(o_rate, 1), "BSC %": round(score, 1),
         })
-    if not rows:
-        return pd.DataFrame()
-    return pd.DataFrame(rows).sort_values(["Hiệu suất (%)", "Công việc"], ascending=[False, False])
+    return pd.DataFrame(rows).sort_values(["BSC %", "Workload"], ascending=[False, False])
 
 
-# -----------------------------------------------------------------------------
-# Header + Jira connection — chế độ không cần Jira Admin
-# -----------------------------------------------------------------------------
-st.title("📊 BSC - Báo cáo hiệu suất đội nhóm")
-st.caption("Web Dashboard V5 · chạy trên Streamlit Community Cloud · không cần Jira Admin.")
+def period_mask(df, basis, start, end):
+    if basis == "Due date trong kỳ":
+        return df["_due"].between(start, end, inclusive="both")
+    if basis == "Hoàn thành trong kỳ":
+        return df["_resolution"].between(start, end, inclusive="both")
+    return df["_created"].between(start, end, inclusive="both")
 
-server_url = secret_or_env("JIRA_BASE_URL", DEFAULT_URL)
-server_email = secret_or_env("JIRA_EMAIL", "")
-server_token = secret_or_env("JIRA_API_TOKEN", "")
-server_jql = secret_or_env("JIRA_DEFAULT_JQL", DEFAULT_JQL)
-server_has_auth = bool(server_url and server_email and server_token)
-cloud_locked = secret_or_env("CLOUD_LOCKED_MODE", "true").strip().lower() in {"1", "true", "yes", "on"}
+
+def pct_delta(cur, prev):
+    if prev == 0:
+        return None
+    return 100 * (cur - prev) / prev
+
+
+# ---------------------------------------------------------------------
+# CONFIG / DATA
+# ---------------------------------------------------------------------
+BASE_URL = secret("JIRA_BASE_URL")
+EMAIL = secret("JIRA_EMAIL")
+TOKEN = secret("JIRA_API_TOKEN")
+DEFAULT_QUERY = secret("JIRA_DEFAULT_JQL", DEFAULT_JQL)
+
+if not (BASE_URL and EMAIL and TOKEN):
+    st.error("Chưa có Jira Secrets. Vào Streamlit Cloud → App settings → Secrets và cấu hình JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN.")
+    st.stop()
 
 with st.sidebar:
-    st.header("🔌 Kết nối Jira — không cần Admin")
-    st.info(
-        "Ứng dụng chỉ dùng REST API đọc dữ liệu theo đúng quyền Jira hiện có của tài khoản. "
-        "Không cài plugin, không tạo app trong Jira, không thay đổi cấu hình hệ thống."
-    )
-
-    if cloud_locked:
-        # Chế độ khuyến nghị khi chạy trên Streamlit Community Cloud:
-        # thông tin Jira nằm trong Streamlit Secrets, không hiện ô nhập token cho người xem.
-        auth_source = "Tài khoản cấu hình sẵn trên server"
-        base_url = server_url
-        email = server_email
-        token = server_token
-        st.caption("🔒 Chế độ Cloud an toàn: Jira URL / tài khoản / API Token được lấy từ Streamlit Secrets.")
-        if server_has_auth:
-            st.success("Đã nạp cấu hình Jira từ Secrets.")
-            st.text_input("Jira URL", value=base_url, disabled=True)
-        else:
-            st.error("Chưa cấu hình JIRA_BASE_URL, JIRA_EMAIL và JIRA_API_TOKEN trong Streamlit Secrets.")
-    else:
-        auth_source = st.radio(
-            "Cách đăng nhập",
-            ["API Token cá nhân", "Tài khoản cấu hình sẵn trên server"],
-            index=1 if server_has_auth else 0,
-            help="Khi triển khai cloud, nên dùng tài khoản cấu hình sẵn trong Secrets.",
-        )
-
-        if auth_source == "Tài khoản cấu hình sẵn trên server":
-            base_url = server_url
-            email = server_email
-            token = server_token
-            st.text_input("Jira URL", value=base_url, disabled=True)
-            if server_has_auth:
-                st.success("Server đã có tài khoản Jira dùng để đọc dữ liệu.")
-            else:
-                st.warning("Server chưa được cấu hình tài khoản. Hãy dùng 'API Token cá nhân'.")
-        else:
-            base_url = st.text_input("Jira URL", value=server_url or DEFAULT_URL, placeholder="https://<ten-cong-ty>.atlassian.net")
-            email = st.text_input("Email/User Jira", value=st.session_state.get("login_email", ""))
-            token = st.text_input("API Token", value="", type="password")
-            st.caption(
-                "Token chỉ được giữ trong phiên Streamlit để gọi Jira; chương trình không ghi token vào CSV, log hay source code. "
-                "Với Jira Cloud *.atlassian.net, dùng API Token thay cho password."
-            )
-
-    jql = st.text_area("JQL lấy dữ liệu", value=server_jql or DEFAULT_JQL, height=130)
-
-    c1, c2 = st.columns(2)
-    test_btn = c1.button("Kiểm tra quyền", use_container_width=True)
-    sync_btn = c2.button("Đồng bộ", type="primary", use_container_width=True)
-
-    logout_btn = st.button("Xóa phiên đăng nhập", use_container_width=True)
-
-    st.divider()
-    st.header("⚙️ Quy tắc KPI")
+    st.markdown("### ⚙️ Cấu hình BSC")
+    jql = st.text_area("JQL", value=DEFAULT_QUERY, height=130)
     done_text = st.text_input("Trạng thái hoàn thành", DONE_DEFAULT)
-    done_statuses = {x.strip().lower() for x in done_text.split(",") if x.strip()}
-    stale_days = st.number_input("Quá N ngày không comment = cập nhật muộn", 1, 60, 7)
-    outside_text = st.text_input("Label công việc ngoài BSC", "ngoai_bsc,outside_bsc")
-    outside_labels = {x.strip().lower() for x in outside_text.split(",") if x.strip()}
-    w_complete = st.slider("Trọng số tỷ lệ hoàn thành", 0, 100, 70, 5)
-    w_ontime = 100 - w_complete
-    st.caption(f"Hiệu suất = {w_complete}% hoàn thành + {w_ontime}% đúng hạn")
+    stale_days = st.number_input("Ngưỡng cập nhật muộn (ngày)", 1, 60, 7)
+    outside_text = st.text_input("Label ngoài BSC", "ngoai_bsc,outside_bsc")
+    st.caption("Complexity: Very Complex=5, Complex=4, Medium=3, Simple=2, Very Simple=1")
+    sync = st.button("🔄 Đồng bộ Jira", type="primary", use_container_width=True)
+    clear = st.button("🧹 Xóa cache phiên", use_container_width=True)
 
-if logout_btn:
-    for k in ["jira_df", "jira_meta", "jira_info", "comment_cache", "active_auth", "diagnostic", "login_email"]:
+if clear:
+    for k in ["jira_df", "jira_meta", "comment_cache"]:
         st.session_state.pop(k, None)
-    st.success("Đã xóa dữ liệu và thông tin đăng nhập khỏi phiên hiện tại.")
     st.rerun()
 
-if test_btn:
-    if not (base_url and email and token):
-        st.sidebar.error("Thiếu Jira URL, Email/User hoặc API Token.")
-    else:
-        try:
-            client = make_client(base_url, email, token)
-            with st.spinner("Đang kiểm tra đăng nhập, quyền xem project, JQL và comment..."):
-                diag = client.diagnose_access(jql.strip() or DEFAULT_JQL, project_key="BANCORE")
-            st.session_state["diagnostic"] = diag
-            st.session_state["jira_info"] = diag["account"]
-            st.session_state["login_email"] = email
-            st.session_state["active_auth"] = {"base_url": base_url, "email": email, "token": token}
-            if diag.get("browse_project") is False:
-                st.sidebar.warning("Đăng nhập được nhưng tài khoản không có Browse Projects đối với BANCORE.")
-            else:
-                st.sidebar.success(f"Kết nối OK: {diag['account'].display_name}")
-        except JiraApiError as exc:
-            st.sidebar.error(str(exc))
-
-if sync_btn:
-    if not (base_url and email and token):
-        st.sidebar.error("Thiếu Jira URL, Email/User hoặc API Token.")
-    elif not jql.strip():
-        st.sidebar.error("JQL đang trống.")
-    else:
-        try:
-            client = make_client(base_url, email, token)
-            info = client.test_connection()
-            with st.spinner("Đang lấy field có quyền xem và toàn bộ Task từ Jira..."):
-                jira_df, meta = load_from_jira(client, jql.strip())
-            st.session_state["jira_df"] = jira_df
-            st.session_state["jira_meta"] = meta
-            st.session_state["jira_info"] = info
-            st.session_state["comment_cache"] = {}
-            st.session_state["active_auth"] = {"base_url": base_url, "email": email, "token": token}
-            st.session_state["login_email"] = email
-            st.success(f"Đã đồng bộ {len(jira_df):,} Jira lúc {meta['loaded_at']}.")
-        except JiraApiError as exc:
-            st.error(str(exc))
-
-# Hiển thị chẩn đoán quyền nếu người dùng đã bấm Kiểm tra quyền.
-diag = st.session_state.get("diagnostic")
-if diag:
-    with st.expander("🧪 Kết quả kiểm tra quyền Jira", expanded=True):
-        a, b, c, d = st.columns(4)
-        a.metric("Đăng nhập", "OK")
-        b.metric("Browse BANCORE", "Có" if diag.get("browse_project") else "Không")
-        c.metric("Field đọc được", diag.get("fields_count", 0))
-        d.metric("JQL mẫu", f"{diag.get('sample_count', 0)} issue")
-        if diag.get("sample_issue"):
-            st.write(f"Issue thử: **{diag['sample_issue']}**")
-        if diag.get("comment_test") == "ok":
-            st.success("Đọc comment: OK (theo quyền của tài khoản).")
-        elif diag.get("comment_test") == "no_issue":
-            st.info("Chưa thử comment vì JQL không trả về issue mẫu.")
-        else:
-            st.warning(f"Comment chưa đọc được: {diag.get('comment_error', 'Không rõ nguyên nhân')}")
-        st.caption(
-            "Không có bước nào ở trên cần Jira Admin. Nếu Browse BANCORE = Không hoặc một số issue không xuất hiện, "
-            "đó là do permission/issue security của tài khoản Jira hiện tại."
-        )
-
-
-# Keep credentials for calls made after initial sync; server secret values are also available on rerun.
-active_auth = st.session_state.get("active_auth")
-if not active_auth and base_url and email and token:
-    active_auth = {"base_url": base_url, "email": email, "token": token}
-
-if "jira_df" not in st.session_state:
-    st.info(
-        "Ở thanh bên trái, nhập **Email/User + API Token**, bấm **Kiểm tra quyền**, sau đó bấm **Đồng bộ**. "
-        "Sau khi đồng bộ, dashboard sẽ chạy hoàn toàn từ dữ liệu Jira API."
-    )
-    st.stop()
-
+if sync or "jira_df" not in st.session_state:
+    try:
+        with st.spinner("Đang đồng bộ dữ liệu từ Jira..."):
+            df, meta = load_jira(BASE_URL, EMAIL, TOKEN, jql)
+        st.session_state["jira_df"] = df
+        st.session_state["jira_meta"] = meta
+        st.session_state.setdefault("comment_cache", {})
+    except JiraApiError as exc:
+        st.error(str(exc))
+        st.stop()
 
 df = st.session_state["jira_df"].copy()
-meta = st.session_state.get("jira_meta", {})
-info = st.session_state.get("jira_info")
+meta = st.session_state["jira_meta"]
+
 if df.empty:
-    st.warning("JQL không trả về Jira nào. Hãy kiểm tra lại JQL/quyền truy cập.")
+    st.warning("JQL không trả về Task nào.")
     st.stop()
 
-status_cols = st.columns([2.2, 1.2, 1.2, 1.4])
-status_cols[0].markdown(
-    f"**Nguồn dữ liệu:** `{base_url}`" + (f" · **Tài khoản:** {info.display_name}" if info else "")
-)
-status_cols[1].metric("Jira đã tải", f"{len(df):,}")
-status_cols[2].metric("Cán bộ", df["_assignee"].nunique())
-status_cols[3].markdown(f"**Đồng bộ:** {meta.get('loaded_at','')}")
-
-with st.expander("Thông tin kỹ thuật lần đồng bộ", expanded=False):
-    st.write({
-        "JQL": jql,
-        "Complexity field ID": meta.get("complexity_id") or "Không tìm thấy",
-        "Epic Link field ID": meta.get("epic_link_id") or "Không tìm thấy / dùng parent",
-        "Số field Jira phát hiện": meta.get("fields_count"),
-    })
+done_statuses = {x.strip().lower() for x in done_text.split(",") if x.strip()}
+outside_labels = {x.strip().lower() for x in outside_text.split(",") if x.strip()}
 
 
-# -----------------------------------------------------------------------------
-# Quick filters
-# -----------------------------------------------------------------------------
-quick = st.container(border=True)
-with quick:
-    q1, q2, q3, q4 = st.columns([1.0, 1.1, 1.5, 1.4])
-    with q1:
-        period_kind = st.selectbox("Kỳ báo cáo", ["Tháng", "Quý", "Năm"])
-    with q4:
-        basis = st.selectbox("Phạm vi công việc", ["Due date trong kỳ", "Hoàn thành trong kỳ", "Created trong kỳ"])
+# ---------------------------------------------------------------------
+# HERO / FILTERS
+# ---------------------------------------------------------------------
+st.markdown(f"""
+<div class="bsc-hero">
+  <div class="bsc-hero-title">BSC Executive Performance</div>
+  <div class="bsc-hero-sub">Jira BANCORE · Epic 7559 · Báo cáo hiệu suất quản trị theo Tháng / Quý / Năm</div>
+  <div class="bsc-live"><span class="bsc-dot"></span> Jira API · Đồng bộ {html.escape(meta.get("loaded_at",""))} · {html.escape(meta.get("user",""))}</div>
+</div>
+""", unsafe_allow_html=True)
 
-    if basis == "Due date trong kỳ":
-        basis_dates = df["_due"]
-    elif basis == "Hoàn thành trong kỳ":
-        basis_dates = df["_resolution"]
-    else:
-        basis_dates = df["_created"]
+f1, f2, f3, f4 = st.columns([1, 1.15, 1.5, 1.3])
+with f1:
+    period_kind = st.selectbox("Kỳ báo cáo", ["Tháng", "Quý", "Năm"])
+with f4:
+    basis = st.selectbox("Căn cứ", ["Due date trong kỳ", "Hoàn thành trong kỳ", "Created trong kỳ"])
 
-    options = period_options(basis_dates, period_kind)
-    with q2:
-        period_label = st.selectbox("Chọn kỳ", options)
-    with q3:
-        staff_options = ["Tất cả"] + sorted(df["_assignee"].dropna().unique().tolist())
-        staff_filter = st.selectbox("Chọn cán bộ", staff_options)
+basis_dates = df["_due"] if basis == "Due date trong kỳ" else df["_resolution"] if basis == "Hoàn thành trong kỳ" else df["_created"]
+opts = period_options(basis_dates, period_kind)
+
+with f2:
+    period_label = st.selectbox("Chọn kỳ", opts)
+with f3:
+    staff_filter = st.selectbox("Cán bộ", ["Tất cả cán bộ"] + sorted(df["_assignee"].dropna().unique().tolist()))
 
 start, end = period_bounds(period_kind, period_label)
-now = pd.Timestamp.now()
-as_of = min(now, end)
+as_of = min(pd.Timestamp.now(), end)
+mask = period_mask(df, basis, start, end)
+period_raw = df[mask].copy()
 
-if basis == "Due date trong kỳ":
-    mask = df["_due"].between(start, end, inclusive="both")
-elif basis == "Hoàn thành trong kỳ":
-    mask = df["_resolution"].between(start, end, inclusive="both")
-else:
-    mask = df["_created"].between(start, end, inclusive="both")
-period_df = df[mask].copy()
-
-if period_df.empty:
-    st.warning(f"Không có công việc trong {period_label} theo phạm vi đã chọn.")
+if period_raw.empty:
+    st.warning("Không có dữ liệu trong kỳ đã chọn.")
     st.stop()
 
+# comment sync only for period
+with st.expander("💬 Dữ liệu Comment / tiến độ", expanded=False):
+    c1, c2 = st.columns([2.5, 1])
+    with c1:
+        st.caption("Nếu chưa đồng bộ Comment, dashboard dùng trường Updated làm dữ liệu thay thế cho độ tươi tiến độ.")
+    with c2:
+        refresh_comments = st.button("Đồng bộ Comment kỳ này", use_container_width=True)
 
-# -----------------------------------------------------------------------------
-# Comment sync for selected period
-# -----------------------------------------------------------------------------
-with st.expander("💬 Đồng bộ comment để đánh giá việc cập nhật tiến độ", expanded=False):
-    st.caption(
-        "Ứng dụng gọi API comment theo từng Jira của kỳ đang xem và giữ cache trong phiên. "
-        "Lần đầu có thể mất vài giây; những lần sau không gọi lại nếu không bấm Làm mới."
-    )
-    auto_comments = st.checkbox("Tự đồng bộ comment cho kỳ đang xem", value=True)
-    force_comments = st.button("Làm mới comment của kỳ này")
+if refresh_comments:
+    with st.spinner(f"Đang đọc comment mới nhất của {len(period_raw)} Jira..."):
+        sync_comments(BASE_URL, EMAIL, TOKEN, period_raw["_key"].tolist(), force=True)
 
-if active_auth and (auto_comments or force_comments):
-    keys = period_df["_key"].astype(str).tolist()
-    try:
-        comment_client = make_client(active_auth["base_url"], active_auth["email"], active_auth["token"])
-        missing_count = sum(1 for k in keys if k not in st.session_state.get("comment_cache", {}))
-        if force_comments or missing_count:
-            with st.spinner(f"Đang đọc comment mới nhất cho {len(keys)} Jira..."):
-                n, err = sync_comments_for_keys(comment_client, keys, force=force_comments)
-            if n:
-                st.caption(f"Đã đọc {n} Jira comment" + (f" · {err} lỗi quyền/API" if err else ""))
-    except JiraApiError as exc:
-        st.warning(f"Không đồng bộ được comment: {exc}")
+period_raw = apply_comments(period_raw)
+period_df, metrics = calc_metrics(period_raw, as_of, done_statuses, stale_days, outside_labels)
 
-period_df = apply_comment_cache(period_df)
-comments_available = bool(period_df["_comment_known"].any())
-comment_error_count = int((period_df["_comment_error"].fillna("") != "").sum())
-if comment_error_count:
-    st.warning(f"Có {comment_error_count} Jira không đọc được comment; các Jira này không bị tính là cập nhật muộn cho đến khi đọc được comment.")
+# Previous period for comparison
+pstart, pend = previous_bounds(period_kind, period_label)
+prev_raw = apply_comments(df[period_mask(df, basis, pstart, pend)].copy())
+_, prev_metrics = calc_metrics(prev_raw, min(pd.Timestamp.now(), pend), done_statuses, stale_days, outside_labels) if not prev_raw.empty else (prev_raw, {
+    "total":0,"done":0,"ontime":0,"late":0,"overdue":0,"doing":0,"stale":0,"outside":0,"workload":0,
+    "completion_rate":0,"ontime_rate":0,"score":0
+})
 
+if staff_filter != "Tất cả cán bộ":
+    period_df = period_df[period_df["_assignee"] == staff_filter].copy()
+    period_df, metrics = calc_metrics(period_df, as_of, done_statuses, stale_days, outside_labels)
 
-# -----------------------------------------------------------------------------
-# Historical KPI state
-# -----------------------------------------------------------------------------
-current_done = period_df["_status"].str.lower().isin(done_statuses)
-done_asof = period_df["_resolution"].notna() & (period_df["_resolution"] <= as_of)
-# Current period: tolerate Done without resolution date.
-done_asof = done_asof | (current_done & period_df["_resolution"].isna() & (end >= now.normalize()))
-
-period_df["_done_asof"] = done_asof
-period_df["_completed_on_time"] = done_asof & period_df["_resolution"].notna() & period_df["_due"].notna() & (period_df["_resolution"] <= period_df["_due"])
-period_df["_completed_late"] = done_asof & period_df["_resolution"].notna() & period_df["_due"].notna() & (period_df["_resolution"] > period_df["_due"])
-period_df["_overdue"] = (~done_asof) & period_df["_due"].notna() & (period_df["_due"] < as_of)
-period_df["_open_not_due"] = (~done_asof) & period_df["_due"].notna() & (period_df["_due"] >= as_of)
-
-period_df["_days_since_comment"] = (as_of.normalize() - period_df["_last_comment"].dt.normalize()).dt.days
-created_age = (as_of.normalize() - period_df["_created"].dt.normalize()).dt.days
-period_df["_late_update"] = (~done_asof) & period_df["_comment_known"] & (
-    (period_df["_last_comment"].notna() & (period_df["_days_since_comment"] > stale_days))
-    | (period_df["_last_comment"].isna() & (created_age > stale_days))
+st.markdown(
+    f'<span class="bsc-period">BSC {html.escape(period_kind.upper())} {html.escape(period_label)}</span>',
+    unsafe_allow_html=True
 )
 
-labels_lower = period_df["_labels"].fillna("").str.lower()
-period_df["_outside_bsc"] = False
-for lab in outside_labels:
-    period_df["_outside_bsc"] |= labels_lower.str.contains(re.escape(lab), na=False)
 
-period_df["_result"] = np.select(
-    [
-        period_df["_completed_on_time"],
-        period_df["_completed_late"],
-        period_df["_overdue"],
-        period_df["_open_not_due"],
-        period_df["_done_asof"],
-    ],
-    ["Hoàn thành đúng hạn", "Hoàn thành trễ", "Quá hạn chưa xong", "Đang thực hiện", "Đã hoàn thành"],
-    default="Khác",
+# ---------------------------------------------------------------------
+# KPI CARDS
+# ---------------------------------------------------------------------
+d_total = pct_delta(metrics["total"], prev_metrics["total"])
+d_work = pct_delta(metrics["workload"], prev_metrics["workload"])
+d_score = metrics["score"] - prev_metrics["score"]
+
+def delta_text(v, suffix="%"):
+    if v is None:
+        return "Kỳ đầu"
+    sign = "+" if v >= 0 else ""
+    return f"{sign}{v:.1f}{suffix}"
+
+cards = [
+    kpi_card("Tổng công việc", f'{metrics["total"]:,}', "so với kỳ trước", "c-blue", "tasks", delta_text(d_total), "up" if (d_total or 0)>=0 else "down"),
+    kpi_card("Đã hoàn thành", f'{metrics["done"]:,}', f'{metrics["completion_rate"]:.1f}% tổng Task', "c-green", "done"),
+    kpi_card("Đúng hạn", f'{metrics["ontime"]:,}', f'{metrics["ontime_rate"]:.1f}% số Done', "c-teal", "time"),
+    kpi_card("Hoàn thành trễ", f'{metrics["late"]:,}', f'{100*metrics["late"]/metrics["total"] if metrics["total"] else 0:.1f}% tổng Task', "c-amber", "late"),
+    kpi_card("Quá hạn chưa Done", f'{metrics["overdue"]:,}', f'{100*metrics["overdue"]/metrics["total"] if metrics["total"] else 0:.1f}% cần xử lý', "c-red", "over"),
+    kpi_card("Đang thực hiện", f'{metrics["doing"]:,}', f'{100*metrics["doing"]/metrics["total"] if metrics["total"] else 0:.1f}% tổng Task', "c-violet", "doing"),
+    kpi_card("Cập nhật muộn", f'{metrics["stale"]:,}', f'quá {stale_days} ngày', "c-gold", "comment"),
+    kpi_card("Ngoài BSC", f'{metrics["outside"]:,}', "theo Labels", "c-cyan", "folder"),
+    kpi_card("Workload điểm", f'{metrics["workload"]:.0f}', "theo Complexity", "c-navy", "workload", delta_text(d_work), "up" if (d_work or 0)>=0 else "down"),
+    kpi_card("BSC hiệu suất", f'{metrics["score"]:.1f}%', "70% hoàn thành + 30% đúng hạn", "c-green", "star", delta_text(d_score, "đ"), "up" if d_score>=0 else "down"),
+]
+st.markdown('<div class="kpi-grid">' + "".join(cards) + '</div>', unsafe_allow_html=True)
+
+
+# ---------------------------------------------------------------------
+# EXECUTIVE SUMMARY
+# ---------------------------------------------------------------------
+completion_gap = metrics["completion_rate"] - 90
+ontime_gap = metrics["ontime_rate"] - 90
+over_rate = 100 * metrics["overdue"] / metrics["total"] if metrics["total"] else 0
+over_gap = over_rate - 5
+
+def cls_gap(gap, inverse=False):
+    ok = gap <= 0 if inverse else gap >= 0
+    return "t-good" if ok else "t-bad"
+
+st.markdown(f"""
+<div class="exec-summary">
+  <div class="exec-intro"><b>Executive BSC Summary</b><p>Đánh giá nhanh mức đạt mục tiêu và các điểm cần can thiệp. Dashboard luôn hiển thị đồng thời số lượng tuyệt đối và tỷ lệ.</p></div>
+  <div class="exec-target"><span>Hoàn thành / mục tiêu</span><strong class="{cls_gap(completion_gap)}">{metrics["completion_rate"]:.1f}% / 90%</strong><small class="{cls_gap(completion_gap)}">{completion_gap:+.1f} điểm %</small></div>
+  <div class="exec-target"><span>Đúng hạn / mục tiêu</span><strong class="{cls_gap(ontime_gap)}">{metrics["ontime_rate"]:.1f}% / 90%</strong><small class="{cls_gap(ontime_gap)}">{ontime_gap:+.1f} điểm %</small></div>
+  <div class="exec-target"><span>Quá hạn / ngưỡng</span><strong class="{cls_gap(over_gap, True)}">{over_rate:.1f}% / ≤5%</strong><small class="{cls_gap(over_gap, True)}">{over_gap:+.1f} điểm %</small></div>
+  <div class="exec-target"><span>BSC tổng hợp</span><strong class="t-good">{metrics["score"]:.1f}%</strong><small class="{'t-good' if d_score>=0 else 't-bad'}">{d_score:+.1f} điểm kỳ trước</small></div>
+</div>
+""", unsafe_allow_html=True)
+
+
+# ---------------------------------------------------------------------
+# STAFF + STATUS
+# ---------------------------------------------------------------------
+st.markdown('<div class="section-title">Hiệu suất BSC theo cán bộ</div><div class="section-sub">Số lượng, tiến độ, đúng hạn, cập nhật và workload trong cùng một bảng.</div>', unsafe_allow_html=True)
+
+staff_df = staff_kpi(period_df)
+st.dataframe(
+    staff_df,
+    use_container_width=True,
+    hide_index=True,
+    column_config={
+        "BSC %": st.column_config.ProgressColumn("BSC %", min_value=0, max_value=100, format="%.1f%%"),
+        "HT %": st.column_config.NumberColumn("HT %", format="%.1f%%"),
+        "Đúng hạn %": st.column_config.NumberColumn("Đúng hạn %", format="%.1f%%"),
+    }
 )
-period_df["_days_late"] = np.where(
-    period_df["_completed_late"],
-    (period_df["_resolution"].dt.normalize() - period_df["_due"].dt.normalize()).dt.days,
-    np.where(
-        period_df["_overdue"],
-        (as_of.normalize() - period_df["_due"].dt.normalize()).dt.days,
-        0,
-    ),
-)
 
-view_df = period_df if staff_filter == "Tất cả" else period_df[period_df["_assignee"] == staff_filter]
-kpi_df = build_kpi(period_df, w_complete, w_ontime)
-
-st.markdown(f"**Đang xem:** {period_kind} **{period_label}** · dữ liệu tính đến **{fmt_date(as_of)}**")
-
-m1, m2, m3, m4, m5 = st.columns(5)
-m1.metric("Công việc", len(view_df))
-m2.metric("Hoàn thành", int(view_df["_done_asof"].sum()))
-m3.metric("Quá hạn", int(view_df["_overdue"].sum()))
-m4.metric("Cập nhật muộn", int(view_df["_late_update"].sum()) if comments_available else "Chưa đọc")
-m5.metric("Ngoài BSC", int(view_df["_outside_bsc"].sum()))
-
-
-# -----------------------------------------------------------------------------
-# Main dashboard
-# -----------------------------------------------------------------------------
-left, right = st.columns([3.2, 1.25], gap="large")
-with left:
-    st.subheader("KPI Hiệu suất Cá nhân")
-    show_kpi = kpi_df if staff_filter == "Tất cả" else kpi_df[kpi_df["Cán bộ"] == staff_filter]
-    st.dataframe(
-        show_kpi,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "Hiệu suất (%)": st.column_config.ProgressColumn("Hiệu suất (%)", min_value=0, max_value=100, format="%.1f%%"),
-            "Hoàn thành (%)": st.column_config.NumberColumn(format="%.1f%%"),
-            "Đúng hạn (%)": st.column_config.NumberColumn(format="%.1f%%"),
-        },
-    )
-
-    fig_perf = px.bar(
-        show_kpi,
-        x="Cán bộ",
-        y="Hiệu suất (%)",
-        text="Hiệu suất (%)",
-        title="Hiệu suất theo cán bộ — click cột để xem Task",
-        range_y=[0, 105],
-    )
-    fig_perf.update_layout(clickmode="event+select", xaxis_title="", yaxis_title="%")
-    state = st.plotly_chart(fig_perf, use_container_width=True, on_select="rerun", selection_mode="points", key="perf")
-    p = selected_point(state)
-    if p and p.get("x"):
-        st.session_state["detail_staff"] = str(p["x"])
-        st.session_state["detail_scope"] = "Tất cả"
-
-with right:
-    st.subheader("Phân bổ Công việc - Loại")
-    comp = view_df["_complexity"].replace("", "Không phân loại").value_counts().reset_index()
-    comp.columns = ["Complexity", "Số lượng"]
-    if len(comp):
-        fig_comp = px.pie(comp, names="Complexity", values="Số lượng", hole=.52)
-        fig_comp.update_layout(margin=dict(l=5, r=5, t=5, b=5))
-        st.plotly_chart(fig_comp, use_container_width=True)
-
-    st.subheader("⚠️ Tổng hợp Vấn đề Quá Hạn")
-    od = period_df.groupby("_assignee")["_overdue"].sum().sort_values(ascending=True)
-    od = od[od > 0]
-    if od.empty:
-        st.success("Không có task quá hạn trong kỳ.")
-    else:
-        od_df = od.reset_index(name="Quá hạn")
-        fig_od = px.bar(od_df, x="Quá hạn", y="_assignee", orientation="h", text="Quá hạn")
-        fig_od.update_layout(clickmode="event+select", xaxis_title="Số task", yaxis_title="")
-        od_state = st.plotly_chart(fig_od, use_container_width=True, on_select="rerun", selection_mode="points", key="od")
-        p = selected_point(od_state)
-        if p and p.get("y"):
-            st.session_state["detail_staff"] = str(p["y"])
-            st.session_state["detail_scope"] = "Quá hạn chưa xong"
-
-st.subheader("Phân bổ kết quả công việc theo cán bộ")
-status_tab = period_df.groupby(["_assignee", "_result"]).size().reset_index(name="Số lượng")
-fig_status = px.bar(status_tab, x="_assignee", y="Số lượng", color="_result", barmode="stack", text_auto=True)
-fig_status.update_layout(clickmode="event+select", xaxis_title="", legend_title="Kết quả")
-status_state = st.plotly_chart(fig_status, use_container_width=True, on_select="rerun", selection_mode="points", key="status")
-p = selected_point(status_state)
-if p and p.get("x"):
-    st.session_state["detail_staff"] = str(p["x"])
-    st.session_state["detail_scope"] = str(p.get("legendgroup") or "Tất cả")
-
-
-# -----------------------------------------------------------------------------
-# Drill-down
-# -----------------------------------------------------------------------------
-st.divider()
-st.subheader("🔎 Chi tiết Task")
-if "detail_staff" not in st.session_state:
-    st.session_state["detail_staff"] = staff_filter if staff_filter != "Tất cả" else "Tất cả"
-if "detail_scope" not in st.session_state:
-    st.session_state["detail_scope"] = "Tất cả"
-if staff_filter != "Tất cả":
-    st.session_state["detail_staff"] = staff_filter
-
-c1, c2, c3 = st.columns([1.3, 1.3, 2.4])
+c1, c2 = st.columns([1.4, 1])
 with c1:
-    detail_staff_options = ["Tất cả"] + sorted(period_df["_assignee"].unique().tolist())
-    current_staff = st.session_state.get("detail_staff", "Tất cả")
-    idx = detail_staff_options.index(current_staff) if current_staff in detail_staff_options else 0
-    detail_staff = st.selectbox("Cán bộ chi tiết", detail_staff_options, index=idx)
-    st.session_state["detail_staff"] = detail_staff
+    result_counts = period_df["_result"].value_counts().reset_index()
+    result_counts.columns = ["Kết quả", "Số lượng"]
+    fig = px.pie(
+        result_counts, names="Kết quả", values="Số lượng", hole=.62,
+        color="Kết quả",
+        color_discrete_map={
+            "Hoàn thành đúng hạn":"#13966a",
+            "Hoàn thành trễ":"#d98b17",
+            "Quá hạn chưa xong":"#d94b57",
+            "Đang thực hiện":"#177ddc",
+            "Đã hoàn thành":"#7257b5",
+            "Khác":"#8fa0ad",
+        },
+        title="Cơ cấu trạng thái công việc"
+    )
+    fig.update_layout(margin=dict(l=10,r=10,t=55,b=10), legend_title="", height=400)
+    fig.update_traces(textinfo="label+value+percent")
+    st.plotly_chart(fig, use_container_width=True)
 with c2:
-    scope_options = ["Tất cả", "Hoàn thành đúng hạn", "Hoàn thành trễ", "Quá hạn chưa xong", "Đang thực hiện", "Cập nhật muộn", "Ngoài BSC"]
-    current_scope = st.session_state.get("detail_scope", "Tất cả")
-    idx = scope_options.index(current_scope) if current_scope in scope_options else 0
-    detail_scope = st.selectbox("Loại task", scope_options, index=idx)
-    st.session_state["detail_scope"] = detail_scope
-with c3:
-    search_text = st.text_input("Tìm Issue / Summary / Label / Component", "")
+    overdue_staff = period_df.groupby("_assignee")["_overdue"].sum().sort_values(ascending=True)
+    overdue_staff = overdue_staff[overdue_staff > 0].reset_index(name="Quá hạn")
+    if overdue_staff.empty:
+        st.success("Không có Task quá hạn trong kỳ.")
+    else:
+        fig = px.bar(
+            overdue_staff, x="Quá hạn", y="_assignee", orientation="h",
+            text="Quá hạn", title="Ranking quá hạn theo cán bộ",
+            color="Quá hạn", color_continuous_scale=["#f6c867","#d94b57"]
+        )
+        fig.update_layout(margin=dict(l=10,r=10,t=55,b=10), yaxis_title="", height=400, coloraxis_showscale=False)
+        st.plotly_chart(fig, use_container_width=True)
 
-D = period_df.copy()
+
+# ---------------------------------------------------------------------
+# DEEP ANALYTICS
+# ---------------------------------------------------------------------
+st.markdown('<div class="section-title">Phân tích phục vụ báo cáo Tháng / Quý / Năm</div><div class="section-sub">Xu hướng, aging, workload, comment và cơ cấu công việc.</div>', unsafe_allow_html=True)
+
+tab1, tab2, tab3, tab4 = st.tabs(["📈 Xu hướng", "⚠️ Rủi ro", "🧩 Workload", "💬 Cập nhật"])
+
+with tab1:
+    year = start.year
+    ydf = df[df["_due"].dt.year == year].copy()
+    if not ydf.empty:
+        ydf = apply_comments(ydf)
+        trend_rows = []
+        for month in range(1, 13):
+            ms = pd.Timestamp(year=year, month=month, day=1)
+            me = ms + pd.offsets.MonthEnd(0) + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1)
+            md = ydf[ydf["_due"].between(ms, me)]
+            if md.empty:
+                trend_rows.append({"Tháng": f"T{month}", "Tổng": 0, "Hoàn thành": 0, "Đúng hạn": 0, "Quá hạn": 0})
+                continue
+            mg, mm = calc_metrics(md, min(pd.Timestamp.now(), me), done_statuses, stale_days, outside_labels)
+            trend_rows.append({"Tháng": f"T{month}", "Tổng": mm["total"], "Hoàn thành": mm["done"], "Đúng hạn": mm["ontime"], "Quá hạn": mm["overdue"]})
+        tdf = pd.DataFrame(trend_rows)
+        fig = px.line(
+            tdf, x="Tháng", y=["Tổng","Hoàn thành","Đúng hạn","Quá hạn"],
+            markers=True, title=f"Xu hướng công việc năm {year}",
+            color_discrete_map={"Tổng":"#285778","Hoàn thành":"#13966a","Đúng hạn":"#0e8fa1","Quá hạn":"#d94b57"}
+        )
+        fig.update_layout(height=430, legend_title="")
+        st.plotly_chart(fig, use_container_width=True)
+
+with tab2:
+    aging = pd.cut(
+        period_df.loc[period_df["_overdue"], "_days_late"],
+        bins=[0,3,7,14,np.inf],
+        labels=["1–3 ngày","4–7 ngày","8–14 ngày",">14 ngày"],
+        include_lowest=True
+    ).value_counts().reindex(["1–3 ngày","4–7 ngày","8–14 ngày",">14 ngày"], fill_value=0).reset_index()
+    aging.columns = ["Nhóm chậm", "Số Task"]
+    a1, a2 = st.columns([1.2,1])
+    with a1:
+        fig = px.bar(aging, x="Nhóm chậm", y="Số Task", text="Số Task", title="Aging Task quá hạn", color="Số Task", color_continuous_scale=["#f6c867","#d94b57"])
+        fig.update_layout(height=360, coloraxis_showscale=False)
+        st.plotly_chart(fig, use_container_width=True)
+    with a2:
+        top_late = period_df[period_df["_overdue"] | period_df["_completed_late"]].sort_values("_days_late", ascending=False).head(10)
+        st.dataframe(
+            pd.DataFrame({
+                "Issue": top_late["_key"],
+                "Cán bộ": top_late["_assignee"],
+                "Due": top_late["_due"].map(fmt_date),
+                "Kết quả": top_late["_result"],
+                "Chậm (ngày)": top_late["_days_late"].astype(int),
+            }),
+            hide_index=True, use_container_width=True
+        )
+
+with tab3:
+    w1, w2 = st.columns(2)
+    with w1:
+        comp = period_df["_complexity"].value_counts().reset_index()
+        comp.columns = ["Complexity","Số Task"]
+        fig = px.bar(comp, x="Số Task", y="Complexity", orientation="h", text="Số Task", title="Phân bổ Complexity", color="Số Task", color_continuous_scale=["#8bc5e8","#285778"])
+        fig.update_layout(height=390, coloraxis_showscale=False)
+        st.plotly_chart(fig, use_container_width=True)
+    with w2:
+        work = period_df.groupby("_assignee")["_workload"].sum().sort_values().reset_index(name="Workload")
+        fig = px.bar(work, x="Workload", y="_assignee", orientation="h", text="Workload", title="Workload điểm theo cán bộ", color="Workload", color_continuous_scale=["#9fe0d2","#13966a"])
+        fig.update_layout(height=390, coloraxis_showscale=False, yaxis_title="")
+        st.plotly_chart(fig, use_container_width=True)
+
+    # Components
+    comps = period_df["_components"].fillna("").str.split("; ").explode()
+    comps = comps[comps.str.strip() != ""].value_counts().head(12).reset_index()
+    comps.columns = ["Component","Số Task"]
+    if not comps.empty:
+        fig = px.bar(comps, x="Component", y="Số Task", text="Số Task", title="Top Component theo số lượng Task", color="Số Task", color_continuous_scale=["#b9d8f3","#177ddc"])
+        fig.update_layout(height=380, coloraxis_showscale=False)
+        st.plotly_chart(fig, use_container_width=True)
+
+with tab4:
+    fresh = pd.cut(
+        period_df["_freshness_days"],
+        bins=[-np.inf,3,7,14,np.inf],
+        labels=["≤3 ngày","4–7 ngày","8–14 ngày",">14 ngày"]
+    ).value_counts().reindex(["≤3 ngày","4–7 ngày","8–14 ngày",">14 ngày"], fill_value=0).reset_index()
+    fresh.columns = ["Độ tươi cập nhật","Số Task"]
+    f1, f2 = st.columns([1.2,1])
+    with f1:
+        fig = px.bar(fresh, x="Độ tươi cập nhật", y="Số Task", text="Số Task", title="Độ tươi Comment / Updated", color="Độ tươi cập nhật",
+                     color_discrete_map={"≤3 ngày":"#13966a","4–7 ngày":"#0e8fa1","8–14 ngày":"#d98b17",">14 ngày":"#d94b57"})
+        fig.update_layout(height=360, showlegend=False)
+        st.plotly_chart(fig, use_container_width=True)
+    with f2:
+        stale_staff = period_df.groupby("_assignee")["_late_update"].sum().sort_values(ascending=False).reset_index(name="Update muộn")
+        stale_staff = stale_staff[stale_staff["Update muộn"] > 0]
+        if stale_staff.empty:
+            st.success("Không có cán bộ nào có Task cập nhật muộn.")
+        else:
+            st.dataframe(stale_staff, hide_index=True, use_container_width=True)
+
+
+# ---------------------------------------------------------------------
+# MANAGEMENT ATTENTION
+# ---------------------------------------------------------------------
+st.markdown('<div class="section-title">Management Attention</div><div class="section-sub">Tự động nêu các điểm cần đưa vào báo cáo quản trị.</div>', unsafe_allow_html=True)
+a1, a2, a3 = st.columns(3)
+with a1:
+    st.markdown(f'<div class="attention red"><b>⚠ {metrics["overdue"]} Task đang quá hạn</b><p>{int((period_df["_days_late"]>7).sum())} Task chậm trên 7 ngày. Cần xác định nguyên nhân và kế hoạch xử lý.</p></div>', unsafe_allow_html=True)
+with a2:
+    st.markdown(f'<div class="attention amber"><b>💬 {metrics["stale"]} Task cập nhật muộn</b><p>Các Task chưa có Comment/Updated trong hơn {stale_days} ngày cần được cập nhật tiến độ.</p></div>', unsafe_allow_html=True)
+with a3:
+    st.markdown(f'<div class="attention blue"><b>▥ Workload {metrics["workload"]:.0f} điểm</b><p>Đánh giá đồng thời số Task và Complexity để tránh thiên lệch do chỉ đếm số lượng.</p></div>', unsafe_allow_html=True)
+
+
+# ---------------------------------------------------------------------
+# DETAIL DRILL-DOWN
+# ---------------------------------------------------------------------
+st.markdown('<div class="section-title">Drill-down Jira chi tiết</div><div class="section-sub">Lọc trực tiếp từng nhóm vấn đề để đưa vào báo cáo hoặc mở lại Jira.</div>', unsafe_allow_html=True)
+
+d1, d2, d3 = st.columns([1.3,1.3,2])
+with d1:
+    detail_staff = st.selectbox("Cán bộ chi tiết", ["Tất cả"] + sorted(period_df["_assignee"].unique().tolist()), key="detail_staff")
+with d2:
+    detail_kind = st.selectbox("Nhóm công việc", ["Tất cả","Hoàn thành đúng hạn","Hoàn thành trễ","Quá hạn chưa xong","Đang thực hiện","Cập nhật muộn","Ngoài BSC"])
+with d3:
+    q = st.text_input("Tìm Issue / Summary / Component / Label")
+
+detail = period_df.copy()
 if detail_staff != "Tất cả":
-    D = D[D["_assignee"] == detail_staff]
-if detail_scope == "Cập nhật muộn":
-    D = D[D["_late_update"]]
-elif detail_scope == "Ngoài BSC":
-    D = D[D["_outside_bsc"]]
-elif detail_scope != "Tất cả":
-    D = D[D["_result"] == detail_scope]
-if search_text.strip():
-    q = re.escape(search_text.strip())
-    D = D[
-        D["_key"].str.contains(q, case=False, na=False)
-        | D["_summary"].str.contains(q, case=False, na=False)
-        | D["_labels"].str.contains(q, case=False, na=False)
-        | D["_components"].str.contains(q, case=False, na=False)
+    detail = detail[detail["_assignee"] == detail_staff]
+if detail_kind == "Cập nhật muộn":
+    detail = detail[detail["_late_update"]]
+elif detail_kind == "Ngoài BSC":
+    detail = detail[detail["_outside_bsc"]]
+elif detail_kind != "Tất cả":
+    detail = detail[detail["_result"] == detail_kind]
+if q.strip():
+    pat = re.escape(q.strip())
+    detail = detail[
+        detail["_key"].str.contains(pat, case=False, na=False)
+        | detail["_summary"].str.contains(pat, case=False, na=False)
+        | detail["_components"].str.contains(pat, case=False, na=False)
+        | detail["_labels"].str.contains(pat, case=False, na=False)
     ]
 
 out = pd.DataFrame({
-    "Issue": D["_key"],
-    "Summary": D["_summary"],
-    "Cán bộ": D["_assignee"],
-    "Status": D["_status"],
-    "Due date": D["_due"].map(fmt_date),
-    "Ngày hoàn thành": D["_resolution"].map(fmt_date),
-    "Kết quả": D["_result"],
-    "Chậm (ngày)": D["_days_late"].fillna(0).astype(int),
-    "Comment gần nhất": D["_last_comment"].map(fmt_date),
-    "Người comment": D["_last_comment_author"],
-    "Nội dung comment gần nhất": D["_last_comment_text"].str.slice(0, 300),
-    "Cập nhật muộn": np.where(D["_late_update"], "Có", ""),
-    "Complexity": D["_complexity"],
-    "Labels": D["_labels"],
-    "Components": D["_components"],
-    "Mở Jira": base_url.rstrip("/") + "/browse/" + D["_key"].astype(str),
+    "Issue": detail["_key"],
+    "Summary": detail["_summary"],
+    "Cán bộ": detail["_assignee"],
+    "Complexity": detail["_complexity"],
+    "Component": detail["_components"],
+    "Labels": detail["_labels"],
+    "Due date": detail["_due"].map(fmt_date),
+    "Resolution": detail["_resolution"].map(fmt_date),
+    "Status": detail["_status"],
+    "Kết quả": detail["_result"],
+    "Chậm (ngày)": detail["_days_late"].fillna(0).astype(int),
+    "Comment gần nhất": detail["_last_comment"].map(fmt_date),
+    "Người comment": detail["_last_comment_author"],
+    "Nội dung cập nhật": detail["_last_comment_text"].str.slice(0, 250),
+    "Mở Jira": BASE_URL.rstrip("/") + "/browse/" + detail["_key"],
 })
 
-st.caption(f"Đang hiển thị {len(out)} task. Click biểu đồ phía trên để drill-down theo cán bộ/vấn đề.")
 st.dataframe(
     out,
     use_container_width=True,
     hide_index=True,
     column_config={
         "Mở Jira": st.column_config.LinkColumn("Mở Jira", display_text="Mở"),
-        "Nội dung comment gần nhất": st.column_config.TextColumn(width="large"),
-    },
+        "Nội dung cập nhật": st.column_config.TextColumn(width="large"),
+    }
 )
 
-csv_bytes = out.to_csv(index=False).encode("utf-8-sig")
 st.download_button(
-    "⬇️ Tải danh sách đang xem (.CSV)",
-    data=csv_bytes,
-    file_name=f"Jira_KPI_{period_label}.csv",
-    mime="text/csv",
+    "⬇️ Tải dữ liệu chi tiết đang lọc",
+    out.to_csv(index=False).encode("utf-8-sig"),
+    file_name=f"BSC_Jira_{period_kind}_{period_label}.csv",
+    mime="text/csv"
 )
 
-st.caption(f"Jira KPI Web V{APP_VERSION}")
+st.caption(f"Jira BSC Executive Dashboard V{APP_VERSION} · Không có chức năng Upload CSV · Dữ liệu lấy trực tiếp từ Jira API.")
