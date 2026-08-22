@@ -12,7 +12,7 @@ import streamlit.components.v1 as components
 from jira_client import JiraApiError, JiraClient
 
 
-APP_VERSION = "8.0"
+APP_VERSION = "8.2"
 DEFAULT_JQL = 'project = "BANCORE" AND parentEpic IN (BANCORE-7559) AND issuetype = Task ORDER BY duedate ASC'
 
 st.set_page_config(
@@ -73,8 +73,102 @@ def iso_date(value: Any) -> str:
     return str(value)[:10]
 
 
+
+def value_matches(value: Any, expected: str) -> bool:
+    """So khớp custom-field dạng text / option / list, không phân biệt hoa thường."""
+    actual = as_text(value).strip().lower()
+    target = str(expected or "").strip().lower()
+    return bool(target) and target in actual
+
+
+def build_row(
+    issue: dict[str, Any],
+    *,
+    complexity_id: str | None,
+    epic_id: str | None,
+    division_id: str | None,
+    comment_map: dict[str, Any],
+    source: str,
+    extra_default_weight: int,
+) -> dict[str, Any]:
+    f = issue.get("fields") or {}
+    assignee = f.get("assignee") or {}
+    status = f.get("status") or {}
+    status_category = status.get("statusCategory") or {}
+    issue_type = f.get("issuetype") or {}
+    components_data = f.get("components") or []
+
+    parent = f.get("parent") or {}
+    epic_value = ""
+    if isinstance(parent, dict):
+        epic_value = str(parent.get("key") or "")
+    if not epic_value and epic_id:
+        epic_value = as_text(f.get(epic_id))
+
+    complexity = as_text(f.get(complexity_id)) if complexity_id else ""
+    if not complexity:
+        complexity = "Không phân loại"
+
+    comment = comment_map.get(str(issue.get("key") or ""))
+    comment_date = ""
+    if isinstance(comment, dict) and not comment.get("error"):
+        comment_date = iso_date(comment.get("created"))
+
+    due = iso_date(f.get("duedate"))
+    resolution = iso_date(f.get("resolutiondate"))
+    created = iso_date(f.get("created"))
+
+    # Quy tắc kỳ báo cáo:
+    # - Nhóm Fusion&QA: ưu tiên Due date.
+    # - Cầu ở project khác: ưu tiên Resolution date, đúng với JQL báo cáo tuần của Cầu.
+    if source == "CAUNN":
+        report_date = resolution or due or created
+        period_basis = "Resolution date" if resolution else ("Due date" if due else "Created")
+    else:
+        report_date = due or resolution or created
+        period_basis = "Due date" if due else ("Resolution date" if resolution else "Created")
+
+    return {
+        "key": str(issue.get("key") or ""),
+        "summary": str(f.get("summary") or ""),
+        "assignee": str(assignee.get("displayName") or "(Chưa phân công)"),
+        "assigneeAccountId": str(assignee.get("accountId") or ""),
+        "team": "Fusion&QA" if source == "FUSION_QA" else "External assignment",
+        "source": source,
+        "division": as_text(f.get(division_id)) if division_id else "",
+        "complexity": complexity,
+        "weightOverride": extra_default_weight if source == "CAUNN" and complexity == "Không phân loại" else 0,
+        "component": "; ".join(
+            str(x.get("name") or "")
+            for x in components_data
+            if isinstance(x, dict) and x.get("name")
+        ),
+        "epic": epic_value,
+        "type": str(issue_type.get("name") or ""),
+        "due": due,
+        "resolution": resolution,
+        "created": created,
+        "reportDate": report_date,
+        "periodBasis": period_basis,
+        "status": str(status.get("name") or ""),
+        "statusCategory": str(status_category.get("key") or ""),
+        "updated": iso_date(f.get("updated")),
+        "comment": comment_date,
+        "labels": [str(x) for x in (f.get("labels") or [])],
+    }
+
+
 @st.cache_data(ttl=900, show_spinner=False)
-def load_dashboard_data(base_url: str, email: str, token: str, jql: str, sync_comments: bool):
+def load_dashboard_data(
+    base_url: str,
+    email: str,
+    token: str,
+    main_jql: str,
+    sync_comments: bool,
+    division_value: str,
+    caunn_jql: str,
+    caunn_default_weight: int,
+):
     client = JiraClient(base_url, email, token)
     me = client.test_connection()
     catalog = client.get_fields()
@@ -85,78 +179,75 @@ def load_dashboard_data(base_url: str, email: str, token: str, jql: str, sync_co
     epic_id = client.resolve_field_id(
         catalog, ["Epic Link", "Parent Epic", "Parent Link"]
     )
+    division_id = client.resolve_field_id(
+        catalog,
+        [
+            "Division of CoreBanking",
+            "Division of Corebanking",
+            "Division CoreBanking",
+            "Division",
+        ],
+    )
+
+    if not division_id:
+        raise JiraApiError(
+            "Không tìm thấy custom field 'Division of CoreBanking' trên Jira. "
+            "Hãy kiểm tra đúng tên field đang hiển thị trên Task."
+        )
 
     fields = [
-        "summary",
-        "assignee",
-        "status",
-        "issuetype",
-        "duedate",
-        "resolutiondate",
-        "created",
-        "updated",
-        "labels",
-        "components",
-        "parent",
+        "summary", "assignee", "status", "issuetype", "duedate",
+        "resolutiondate", "created", "updated", "labels", "components", "parent",
     ]
-    for fid in (complexity_id, epic_id):
+    for fid in (complexity_id, epic_id, division_id):
         if fid and fid not in fields:
             fields.append(fid)
 
-    issues = client.search_issues(jql, fields, page_size=100, max_issues=10000)
+    # Nguồn 1: Epic BANCORE nhưng CHỈ lấy Task có Division of CoreBanking = Fusion&QA.
+    main_all = client.search_issues(main_jql, fields, page_size=100, max_issues=10000)
+    main_issues = [
+        issue for issue in main_all
+        if value_matches((issue.get("fields") or {}).get(division_id), division_value)
+    ]
 
-    comment_map = {}
-    if sync_comments and issues:
-        keys = [str(issue.get("key") or "") for issue in issues if issue.get("key")]
+    # Nguồn 2: Cầu ở project khác.
+    # JQL này nên là base query, không giới hạn tuần, để Dashboard tự lọc Tháng/Quý/Năm.
+    caunn_issues = []
+    if caunn_jql.strip():
+        caunn_issues = client.search_issues(
+            caunn_jql.strip(), fields, page_size=100, max_issues=10000
+        )
+
+    # Gộp 2 nguồn, loại trùng theo Issue Key.
+    keyed: dict[str, tuple[dict[str, Any], str]] = {}
+    for issue in main_issues:
+        key = str(issue.get("key") or "")
+        if key:
+            keyed[key] = (issue, "FUSION_QA")
+    for issue in caunn_issues:
+        key = str(issue.get("key") or "")
+        if key:
+            keyed[key] = (issue, "CAUNN")
+
+    combined = list(keyed.values())
+
+    comment_map: dict[str, Any] = {}
+    if sync_comments and combined:
+        keys = [str(issue.get("key") or "") for issue, _ in combined if issue.get("key")]
         comment_map = client.latest_comments_bulk(keys, workers=8)
 
-    rows = []
-    for issue in issues:
-        fields_data = issue.get("fields") or {}
-        assignee = fields_data.get("assignee") or {}
-        status = fields_data.get("status") or {}
-        status_category = status.get("statusCategory") or {}
-        issue_type = fields_data.get("issuetype") or {}
-        components_data = fields_data.get("components") or []
-
-        parent = fields_data.get("parent") or {}
-        epic_value = ""
-        if isinstance(parent, dict):
-            epic_value = str(parent.get("key") or "")
-        if not epic_value and epic_id:
-            epic_value = as_text(fields_data.get(epic_id))
-
-        complexity = as_text(fields_data.get(complexity_id)) if complexity_id else ""
-        if not complexity:
-            complexity = "Không phân loại"
-
-        comment = comment_map.get(str(issue.get("key") or ""))
-        comment_date = ""
-        if isinstance(comment, dict) and not comment.get("error"):
-            comment_date = iso_date(comment.get("created"))
-
-        rows.append({
-            "key": str(issue.get("key") or ""),
-            "summary": str(fields_data.get("summary") or ""),
-            "assignee": str(assignee.get("displayName") or "(Chưa phân công)"),
-            "team": "",
-            "complexity": complexity,
-            "component": "; ".join(
-                str(x.get("name") or "")
-                for x in components_data
-                if isinstance(x, dict) and x.get("name")
-            ),
-            "epic": epic_value,
-            "type": str(issue_type.get("name") or ""),
-            "due": iso_date(fields_data.get("duedate")),
-            "resolution": iso_date(fields_data.get("resolutiondate")),
-            "status": str(status.get("name") or ""),
-            "statusCategory": str(status_category.get("key") or ""),
-            "updated": iso_date(fields_data.get("updated")),
-            # Nếu đọc được Comment thì dùng Comment; nếu không, JS tự fallback sang Updated.
-            "comment": comment_date,
-            "labels": [str(x) for x in (fields_data.get("labels") or [])],
-        })
+    rows = [
+        build_row(
+            issue,
+            complexity_id=complexity_id,
+            epic_id=epic_id,
+            division_id=division_id,
+            comment_map=comment_map,
+            source=source,
+            extra_default_weight=caunn_default_weight,
+        )
+        for issue, source in combined
+    ]
 
     return {
         "rows": rows,
@@ -164,6 +255,12 @@ def load_dashboard_data(base_url: str, email: str, token: str, jql: str, sync_co
         "loaded_at": datetime.now().astimezone().strftime("%d/%m/%Y %H:%M:%S"),
         "complexity_id": complexity_id or "",
         "epic_id": epic_id or "",
+        "division_id": division_id or "",
+        "division_value": division_value,
+        "main_before_division": len(main_all),
+        "main_after_division": len(main_issues),
+        "caunn_count": len(caunn_issues),
+        "combined_count": len(rows),
     }
 
 
@@ -174,6 +271,21 @@ jql = secret("JIRA_DEFAULT_JQL", DEFAULT_JQL)
 sync_comments = secret("JIRA_SYNC_COMMENTS", "true").strip().lower() in {"1", "true", "yes", "y"}
 target_workload = int(secret("JIRA_TARGET_WORKLOAD_MONTH", "20") or "20")
 
+# Lọc nhóm theo custom field của Task, không lọc theo tên cán bộ nữa.
+division_value = secret("JIRA_DIVISION_VALUE", "Fusion&QA")
+
+# Cầu ở project khác. Base JQL bỏ điều kiện thời gian tuần để Dashboard tự lọc Tháng/Quý/Năm.
+caunn_jql = secret(
+    "JIRA_CAUNN_JQL",
+    'project = "2024.PS006_Xây dựng ứng dụng tác nghiệp tập trung tại quầy" '
+    'AND assignee = 712020:c282b441-9290-4c08-bc66-d834b94e17a7 '
+    'AND issuetype = Sub-task '
+    'AND status IN (Done, Closed, Resolved) '
+    'ORDER BY resolved DESC'
+)
+caunn_default_weight = int(secret("JIRA_CAUNN_DEFAULT_WEIGHT", "1") or "1")
+
+
 if not base_url or not email or not token:
     st.error(
         "Thiếu Jira Secrets. Cần có JIRA_BASE_URL, JIRA_EMAIL và JIRA_API_TOKEN "
@@ -183,9 +295,16 @@ if not base_url or not email or not token:
 
 try:
     with st.spinner("Đang đồng bộ dữ liệu Jira..."):
-        payload = load_dashboard_data(base_url, email, token, jql, sync_comments)
+        payload = load_dashboard_data(base_url, email, token, jql, sync_comments, division_value, caunn_jql, caunn_default_weight)
 except JiraApiError as exc:
     st.error(f"Lỗi Jira API: {exc}")
+    st.stop()
+
+if not payload["rows"]:
+    st.error(
+        "Không có công việc nào sau khi gộp Division Fusion&QA và nguồn của Cầu. "
+        "Hãy kiểm tra JIRA_DIVISION_VALUE và JIRA_CAUNN_JQL trong Streamlit Secrets."
+    )
     st.stop()
 
 template_path = Path(__file__).with_name("dashboard_template.html")
