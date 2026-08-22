@@ -270,17 +270,23 @@ def icon_svg(name: str) -> str:
 
 
 def kpi_card(label, value, meta, css, icon, delta=None, delta_kind="neutral"):
+    # QUAN TRỌNG: trả HTML dạng một dòng, không có blank line/indent đầu dòng.
+    # Nếu có dòng trống + 4 khoảng trắng, Markdown của Streamlit có thể
+    # hiểu phần HTML kế tiếp là code block và hiển thị nguyên thẻ <div>.
     delta_html = ""
     if delta is not None:
         cls = {"up": "delta-up", "down": "delta-down", "neutral": "delta-neutral"}[delta_kind]
         delta_html = f'<span class="delta {cls}">{html.escape(str(delta))}</span>'
-    return f"""
-    <div class="kpi-card {css}">
-      <div class="kpi-top"><span class="kpi-label">{html.escape(label)}</span><span class="kpi-icon">{icon_svg(icon)}</span></div>
-      <div class="kpi-value">{html.escape(str(value))}</div>
-      <div class="kpi-meta">{delta_html}{meta}</div>
-    </div>
-    """
+    return (
+        f'<div class="kpi-card {css}">'
+        f'<div class="kpi-top">'
+        f'<span class="kpi-label">{html.escape(label)}</span>'
+        f'<span class="kpi-icon">{icon_svg(icon)}</span>'
+        f'</div>'
+        f'<div class="kpi-value">{html.escape(str(value))}</div>'
+        f'<div class="kpi-meta">{delta_html}{meta}</div>'
+        f'</div>'
+    )
 
 
 def calc_metrics(data: pd.DataFrame, as_of: pd.Timestamp, done_statuses, stale_days, outside_labels):
@@ -525,7 +531,7 @@ cards = [
     kpi_card("Workload điểm", f'{metrics["workload"]:.0f}', "theo Complexity", "c-navy", "workload", delta_text(d_work), "up" if (d_work or 0)>=0 else "down"),
     kpi_card("BSC hiệu suất", f'{metrics["score"]:.1f}%', "70% hoàn thành + 30% đúng hạn", "c-green", "star", delta_text(d_score, "đ"), "up" if d_score>=0 else "down"),
 ]
-st.markdown('<div class="kpi-grid">' + "".join(cards) + '</div>', unsafe_allow_html=True)
+st.markdown('<div class="kpi-grid">' + ''.join(cards) + '</div>', unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------
