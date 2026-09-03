@@ -39,6 +39,14 @@ def adf_to_text(value: Any) -> str:
     return " ".join(x.strip() for x in parts if x and x.strip()).strip()
 
 
+def _normalized_marker_text(value: Any) -> str:
+    """Normalize Vietnamese text so markers such as 'cập nhật muộn' match reliably."""
+    import unicodedata
+    text = unicodedata.normalize("NFKD", str(value or ""))
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    return re.sub(r"\s+", " ", text.lower()).strip()
+
+
 @dataclass
 class JiraConnectionInfo:
     display_name: str
@@ -189,22 +197,107 @@ class JiraClient:
             start_at += len(batch)
         return issues
 
-    def latest_comment(self, issue_key: str) -> dict[str, Any] | None:
-        params = {"maxResults": 1, "orderBy": "-created"}
-        data = self._request(
-            "GET", f"/rest/api/3/issue/{issue_key}/comment", params=params
-        ).json()
-        comments = data.get("comments") or []
-        if not comments:
-            return None
-        c = comments[0]
+    def get_all_comments(self, issue_key: str) -> list[dict[str, Any]]:
+        """Return all comments of an issue, paginated, oldest -> newest."""
+        comments: list[dict[str, Any]] = []
+        start_at = 0
+        page_size = 100
+        while True:
+            params = {
+                "startAt": start_at,
+                "maxResults": page_size,
+                "orderBy": "created",
+            }
+            data = self._request(
+                "GET", f"/rest/api/3/issue/{issue_key}/comment", params=params
+            ).json()
+            batch = data.get("comments") or []
+            comments.extend(batch)
+            total = int(data.get("total") or len(comments))
+            if not batch or len(comments) >= total:
+                break
+            start_at += len(batch)
+        return comments
+
+    def comment_audit(
+        self,
+        issue_key: str,
+        *,
+        late_update_marker: str = "cập nhật muộn",
+        reviewer_account_id: str = "",
+    ) -> dict[str, Any]:
+        """Summarize comment history for BSC.
+
+        A task is marked as late-update when ANY comment contains the configured
+        marker. This is the team-lead's explicit audit flag, so we do not infer
+        late-update from Jira Updated timestamp or from a >7-day heuristic.
+        """
+        raw_comments = self.get_all_comments(issue_key)
+        marker = _normalized_marker_text(late_update_marker)
+
+        latest: dict[str, Any] | None = None
+        late_marker_comment: dict[str, Any] | None = None
+        parsed: list[dict[str, Any]] = []
+
+        for c in raw_comments:
+            item = {
+                "created": c.get("created"),
+                "updated": c.get("updated"),
+                "author": (c.get("author") or {}).get("displayName", ""),
+                "authorAccountId": (c.get("author") or {}).get("accountId", ""),
+                "body": adf_to_text(c.get("body")),
+                "id": c.get("id"),
+            }
+            parsed.append(item)
+            latest = item
+            marker_match = marker and marker in _normalized_marker_text(item["body"])
+            reviewer_match = (not reviewer_account_id) or item["authorAccountId"] == reviewer_account_id
+            if marker_match and reviewer_match:
+                late_marker_comment = item
+
         return {
-            "created": c.get("created"),
-            "updated": c.get("updated"),
-            "author": (c.get("author") or {}).get("displayName", ""),
-            "body": adf_to_text(c.get("body")),
-            "id": c.get("id"),
+            "count": len(parsed),
+            "latest": latest,
+            "lateUpdate": late_marker_comment is not None,
+            "lateUpdateComment": late_marker_comment,
         }
+
+    def comments_audit_bulk(
+        self,
+        issue_keys: Iterable[str],
+        *,
+        late_update_marker: str = "cập nhật muộn",
+        reviewer_account_id: str = "",
+        workers: int = 8,
+    ) -> dict[str, dict[str, Any]]:
+        keys = [str(x).strip() for x in issue_keys if str(x).strip()]
+        result: dict[str, dict[str, Any]] = {}
+        if not keys:
+            return result
+
+        workers = max(1, min(int(workers), 12))
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = {
+                executor.submit(
+                    self.comment_audit,
+                    key,
+                    late_update_marker=late_update_marker,
+                    reviewer_account_id=reviewer_account_id,
+                ): key
+                for key in keys
+            }
+            for future in as_completed(futures):
+                key = futures[future]
+                try:
+                    result[key] = future.result()
+                except Exception as exc:
+                    result[key] = {"error": str(exc)}
+        return result
+
+    # Backward-compatible helpers kept for any other code that still calls them.
+    def latest_comment(self, issue_key: str) -> dict[str, Any] | None:
+        audit = self.comment_audit(issue_key)
+        return audit.get("latest")
 
     def latest_comments_bulk(
         self,
@@ -212,10 +305,14 @@ class JiraClient:
         *,
         workers: int = 8,
     ) -> dict[str, dict[str, Any] | None]:
-        keys = [str(x).strip() for x in issue_keys if str(x).strip()]
+        audits = self.comments_audit_bulk(issue_keys, workers=workers)
         result: dict[str, dict[str, Any] | None] = {}
-        if not keys:
-            return result
+        for key, audit in audits.items():
+            if audit.get("error"):
+                result[key] = {"error": audit["error"]}
+            else:
+                result[key] = audit.get("latest")
+        return result
 
         workers = max(1, min(int(workers), 12))
         with ThreadPoolExecutor(max_workers=workers) as executor:
