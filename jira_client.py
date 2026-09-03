@@ -1,4 +1,4 @@
-
+from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -75,7 +75,7 @@ class JiraClient:
         self.session.headers.update({
             "Accept": "application/json",
             "Content-Type": "application/json",
-            "User-Agent": "Jira-BSC-Executive/9.1",
+            "User-Agent": "Jira-BSC-Executive/10.0",
         })
 
     def _request(self, method: str, path: str, **kwargs) -> requests.Response:
@@ -228,9 +228,10 @@ class JiraClient:
     ) -> dict[str, Any]:
         """Summarize comment history for BSC.
 
-        A task is marked as late-update when ANY comment contains the configured
-        marker. This is the team-lead's explicit audit flag, so we do not infer
-        late-update from Jira Updated timestamp or from a >7-day heuristic.
+        A task is marked as late-update when a comment contains the configured
+        marker. This is an explicit BSC audit flag; we never infer it from Jira
+        Updated timestamp or from a >7-day heuristic. If reviewer_account_id is
+        configured, only that reviewer's comments are accepted.
         """
         raw_comments = self.get_all_comments(issue_key)
         marker = _normalized_marker_text(late_update_marker)
