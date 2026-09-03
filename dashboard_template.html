@@ -233,15 +233,15 @@ table{border-collapse:collapse;width:100%;font-size:9px}th{background:#f8fafc;co
       <div class="kpi-link">Xem trên Jira</div>
     </div>
   </div>
-  <div class="kpi k-amber" data-kind="soon">
+  <div class="kpi k-amber" data-kind="doing">
     <div>
-      <div class="kpi-head"><span class="kpi-label">Sắp đến hạn (≤3 ngày)</span><span class="kpi-icon"><svg viewBox="0 0 24 24"><path d="M7 3h10M7 21h10M8 3c0 5 2 6 4 9-2 3-4 4-4 9M16 3c0 5-2 6-4 9 2 3 4 4 4 9"/></svg></span></div>
-      <div class="kpi-val" id="kSoon">0</div>
-      <div class="kpi-rate" id="rSoon">0%</div>
+      <div class="kpi-head"><span class="kpi-label">Đang thực hiện</span><span class="kpi-icon"><svg viewBox="0 0 24 24"><path d="M7 3h10M7 21h10M8 3c0 5 2 6 4 9-2 3-4 4-4 9M16 3c0 5-2 6-4 9 2 3 4 4 4 9"/></svg></span></div>
+      <div class="kpi-val" id="kDoing">0</div>
+      <div class="kpi-rate" id="rDoing">Chưa quá hạn</div>
     </div>
     <div class="kpi-bottom">
-      <div class="kpi-delta"><strong id="dSoon">—</strong> so với kỳ trước</div>
-      <div class="kpi-meter"><span id="mSoon"></span></div>
+      <div class="kpi-delta"><strong id="dDoing">—</strong> so với kỳ trước</div>
+      <div class="kpi-meter"><span id="mDoing"></span></div>
       <div class="kpi-link">Xem trên Jira</div>
     </div>
   </div>
@@ -261,7 +261,7 @@ table{border-collapse:collapse;width:100%;font-size:9px}th{background:#f8fafc;co
 
 <section class="attention-grid" id="alertSec">
   <div class="card">
-    <div class="card-title">Cần xử lý hôm nay</div>
+    <div class="card-title">Cảnh báo theo kỳ BSC</div>
     <div class="attention-list">
       <div class="alert-card a-red" data-kind="over7"><div class="alert-ico"><svg viewBox="0 0 24 24"><path d="M12 3 2.5 20h19L12 3Z"/><path d="M12 9v5M12 17h.01"/></svg></div><div><b id="aOver7">0</b><p>Công việc quá hạn &gt; 7 ngày</p><a href="#">Xem đúng danh sách Jira ↗</a></div></div>
       <div class="alert-card a-amber" data-kind="soon"><div class="alert-ico"><svg viewBox="0 0 24 24"><path d="M12 4 3 20h18z"/></svg></div><div><b id="aSoon">0</b><p>Công việc sắp đến hạn (≤ 3 ngày)</p><a href="#">Xem đúng danh sách Jira ↗</a></div></div>
@@ -271,18 +271,18 @@ table{border-collapse:collapse;width:100%;font-size:9px}th{background:#f8fafc;co
   </div>
   <div class="card">
     <div class="card-title">Quy tắc theo dõi BSC đang áp dụng</div>
-    <div class="thresholds"><div class="threshold"><span>Kỳ BSC của Task</span><strong>Theo Due date</strong></div><div class="threshold"><span>Hết hạn trong ngày</span><strong>23:59:59</strong></div><div class="threshold"><span>Mốc chốt Task</span><strong>Cuối tháng Due date</strong></div><div class="threshold"><span>Cập nhật muộn</span><strong>Comment “cập nhật muộn”</strong></div><div class="threshold"><span>Workload % / BSC</span><strong>Tạm tắt</strong></div></div>
+    <div class="thresholds"><div class="threshold"><span>Kỳ BSC của Task</span><strong>Theo Due date</strong></div><div class="threshold"><span>Hết hạn trong ngày</span><strong>Sau 23:59:59</strong></div><div class="threshold"><span>Quá hạn</span><strong>DONE sau Due vẫn tính Quá hạn</strong></div><div class="threshold"><span>Cập nhật muộn</span><strong>Comment trưởng nhóm xác nhận</strong></div><div class="threshold"><span>Đối soát phân loại</span><strong id="classCheck">0 / 0</strong></div><div class="threshold"><span>Workload % / BSC</span><strong>Tạm tắt</strong></div></div>
   </div>
 </section>
 
 <section class="performance" id="staffSec">
   <div class="card">
     <div class="card-title">Hiệu suất cán bộ</div>
-    <div class="table-wrap"><table><thead><tr><th>#</th><th>Cán bộ</th><th>Tổng việc</th><th>Hoàn thành</th><th>Đúng hạn (%)</th><th>HT trễ (%)</th><th>Quá hạn</th><th>Sắp đến hạn</th><th>Cập nhật muộn</th><th>Workload (tham khảo)</th></tr></thead><tbody id="staffBody"></tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th>#</th><th>Cán bộ</th><th>Tổng việc</th><th>Hoàn thành</th><th>Đúng hạn (%)</th><th>Quá hạn (%)</th><th>QH đã HT</th><th>QH chưa HT tại mốc</th><th>Sắp đến hạn</th><th>Cập nhật muộn</th><th>Workload (tham khảo)</th></tr></thead><tbody id="staffBody"></tbody></table></div>
   </div>
   <div class="card">
     <div class="card-title">Phân bổ trạng thái công việc</div>
-    <div class="donut-wrap"><div class="donut" id="donut"><div class="donut-center"><div><strong id="donutTotal">0</strong><span>Tổng</span></div></div></div><div class="legend"><div class="leg" data-kind="ontime"><i class="dot" style="background:#18a86f"></i><span>Đúng hạn</span><strong id="lOn">0</strong></div><div class="leg" data-kind="late"><i class="dot" style="background:#f0aa26"></i><span>Hoàn thành trễ</span><strong id="lLate">0</strong></div><div class="leg" data-kind="overdue"><i class="dot" style="background:#e45660"></i><span>Quá hạn</span><strong id="lOver">0</strong></div><div class="leg" data-kind="doing"><i class="dot" style="background:#2386d7"></i><span>Đang thực hiện</span><strong id="lDoing">0</strong></div></div></div>
+    <div class="donut-wrap"><div class="donut" id="donut"><div class="donut-center"><div><strong id="donutTotal">0</strong><span>Tổng</span></div></div></div><div class="legend"><div class="leg" data-kind="ontime"><i class="dot" style="background:#18a86f"></i><span>Đúng hạn</span><strong id="lOn">0</strong></div><div class="leg" data-kind="stale"><i class="dot" style="background:#8b5cf6"></i><span>Cập nhật muộn</span><strong id="lStaleDonut">0</strong></div><div class="leg" data-kind="overdue"><i class="dot" style="background:#e45660"></i><span>Quá hạn</span><strong id="lOver">0</strong></div><div class="leg" data-kind="doing"><i class="dot" style="background:#2386d7"></i><span>Đang thực hiện</span><strong id="lDoing">0</strong></div></div></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
       <div style="background:#f7fbfa;border:1px solid #e1efeb;border-radius:9px;padding:8px 10px;text-align:center"><div style="font-size:8px;color:#789285">Tỷ lệ hoàn thành</div><strong id="donutDoneRate" style="font-size:15px;color:#149a68">0%</strong></div>
       <div style="background:#f9fbfe;border:1px solid #e4ecf4;border-radius:9px;padding:8px 10px;text-align:center"><div style="font-size:8px;color:#7d8fa0">Tỷ lệ đúng hạn</div><strong id="donutOnRate" style="font-size:15px;color:#1672cb">0%</strong></div>
@@ -295,7 +295,7 @@ table{border-collapse:collapse;width:100%;font-size:9px}th{background:#f8fafc;co
 </section>
 
 <section class="card detail" id="detailSec">
-  <div class="detail-head"><div><div class="card-title">Chi tiết công việc Jira (Drill-down)</div><div class="card-sub" id="detailSub">Tất cả công việc</div></div><div class="detail-actions"><button class="chip active" data-filter="all">Tất cả</button><button class="chip" data-filter="ontime">Đúng hạn</button><button class="chip" data-filter="late">HT trễ</button><button class="chip" data-filter="overdue">Quá hạn</button><button class="chip" data-filter="soon">Sắp đến hạn</button><button class="chip" data-filter="stale">Cập nhật muộn</button></div></div>
+  <div class="detail-head"><div><div class="card-title">Chi tiết công việc Jira (Drill-down)</div><div class="card-sub" id="detailSub">Tất cả công việc</div></div><div class="detail-actions"><button class="chip active" data-filter="all">Tất cả</button><button class="chip" data-filter="ontime">Đúng hạn</button><button class="chip" data-filter="overdue">Quá hạn</button><button class="chip" data-filter="late">QH đã HT</button><button class="chip" data-filter="overdueOpen">QH chưa HT tại mốc</button><button class="chip" data-filter="soon">Sắp đến hạn</button><button class="chip" data-filter="stale">Cập nhật muộn</button></div></div>
   <div class="table-wrap"><table class="detail-table"><thead><tr><th>Key</th><th>Summary</th><th>Cán bộ</th><th>Complexity</th><th>Component</th><th>Epic</th><th>Loại việc</th><th>Due date</th><th>Resolution date</th><th>Trạng thái</th><th>Số ngày trễ</th><th>Cập nhật gần nhất</th><th>Nguồn</th><th>Căn cứ kỳ</th><th>Mức cảnh báo</th></tr></thead><tbody id="taskBody"></tbody></table></div>
   
   <div class="pagination-wrap" id="paginationWrap">
@@ -315,7 +315,7 @@ table{border-collapse:collapse;width:100%;font-size:9px}th{background:#f8fafc;co
     </div>
   </div>
 
-  <div class="footer-note"><span><strong>Quy tắc BSC:</strong> Task thuộc duy nhất kỳ của Due date; Due date hết hạn lúc 23:59:59; Task chưa hoàn thành tại cuối tháng Due date được giữ là Quá hạn của tháng BSC đó dù tháng sau mới Done; báo cáo Quý/Năm chỉ tổng hợp các kết quả tháng đã khóa.</span><span><strong>Cập nhật muộn:</strong> chỉ tính khi lịch sử comment có nội dung “cập nhật muộn” do trưởng nhóm xác nhận. Workload % và điểm BSC đang tạm tắt.</span></div>
+  <div class="footer-note"><span><strong>Quy tắc BSC:</strong> Task thuộc duy nhất kỳ của Due date. Due 21/08 chỉ bắt đầu quá hạn từ 00:00 ngày 22/08. Nếu DONE ngày 28/08 thì vẫn là <b>Quá hạn – đã hoàn thành</b>; nếu đến mốc cuối tháng vẫn chưa DONE thì là <b>Quá hạn – chưa hoàn thành tại mốc BSC</b>. Quý/Năm chỉ tổng hợp các kết quả tháng gốc, không chuyển Task sang tháng DONE.</span><span><strong>Cập nhật muộn:</strong> là ngoại lệ do trưởng nhóm xác nhận bằng comment marker; Task được tách khỏi Quá hạn và ghi riêng Cập nhật muộn. Workload % và điểm BSC đang tạm tắt.</span></div>
 </section>
 </div>
 </main>
@@ -328,7 +328,8 @@ const DATA = __JIRA_DATA__;
 const WEIGHT={"Very Simple":1,"Simple":2,"Medium":3,"Complex":4,"Very Complex":5};
 const $=q=>document.querySelector(q), $$=q=>[...document.querySelectorAll(q)];
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
-const d=s=>s?new Date(s+"T00:00:00"):null;
+const d=s=>s?new Date(String(s).slice(0,10)+"T00:00:00"):null;
+const dt=s=>{if(!s)return null;const v=String(s);if(/^\d{4}-\d{2}-\d{2}$/.test(v))return new Date(v+"T00:00:00");const z=v.replace(/([+-]\d{2})(\d{2})$/,"$1:$2");const x=new Date(z);return Number.isNaN(x.getTime())?d(v):x};
 const endOfDay=v=>{const x=v instanceof Date?new Date(v):d(v);if(!x)return null;x.setHours(23,59,59,999);return x};
 const day=(a,b)=>Math.ceil((a-b)/86400000);
 const fmt=s=>s?d(s).toLocaleDateString("vi-VN"):"-";
@@ -383,42 +384,99 @@ function monthCutoffExclusive(dueStart){
  return new Date(dueStart.getFullYear(),dueStart.getMonth()+1,1,0,0,0,0);
 }
 function state(x){
- const dueStart=d(x.due),dueDeadline=nextDayStart(dueStart),res=d(x.resolution),now=new Date(),monthCutoff=monthCutoffExclusive(dueStart);
+ const dueStart=d(x.due),dueDeadline=nextDayStart(dueStart),res=dt(x.resolutionAt||x.resolution),now=new Date(),monthCutoff=monthCutoffExclusive(dueStart);
  const historical=!!monthCutoff&&now>=monthCutoff;
- // Mốc đánh giá: kỳ quá khứ = 00:00 ngày đầu tháng sau (exclusive cutoff); tháng hiện tại = thời điểm hiện tại.
+ // Mốc BSC của mỗi Task luôn là tháng GỐC theo Due date.
+ // Tháng đã kết thúc: đánh giá tại 00:00 ngày đầu tháng sau.
  const asof=historical?monthCutoff:now;
  const statusDone=(String(x.statusCategory||"").toLowerCase()==="done")||["done","closed","resolved"].includes(String(x.status||"").toLowerCase());
- // BSC MONTH LOCK: mỗi Task được đánh giá tại cuối THÁNG của Due date.
- // Resolution ở tháng sau KHÔNG được quay lại biến Task tháng trước thành hoàn thành.
- const done=(!!res&&(historical?res<asof:res<=asof))||(!res&&statusDone&&!historical);
- // Due date có hiệu lực đến hết 23:59:59; deadline kỹ thuật là 00:00 ngày kế tiếp.
- const ontime=done&&!!res&&!!dueDeadline&&res<dueDeadline;
- const late=done&&!!res&&!!dueDeadline&&res>=dueDeadline;
- const overdue=!done&&!!dueDeadline&&dueDeadline<=asof;
+
+ // Resolution phải được ghi nhận trước mốc as_of mới được xem là đã hoàn thành trong tháng BSC.
+ // Không dùng Updated làm ngày hoàn thành lịch sử.
+ const resRecordedByAsof=!!res&&(historical?res<asof:res<=asof);
+ const doneRecorded=resRecordedByAsof||(!historical&&!res&&statusDone);
+
+ // Cập nhật muộn là NGOẠI LỆ có xác nhận trưởng nhóm bằng comment marker.
+ // Khi có marker và Task đã/đang ở trạng thái Done, tách Task khỏi nhóm Quá hạn.
+ const stale=Boolean(x.lateUpdate)&&(!!res||statusDone);
+ const done=stale||doneRecorded;
+
+ // Đúng hạn: Resolution trước 00:00 ngày sau Due.
+ // Với tháng hiện tại, nếu Jira đã Done nhưng thiếu Resolution và hiện vẫn chưa tới deadline,
+ // có thể xác nhận là Done trước hạn tại thời điểm quan sát. Với tháng lịch sử thì không suy đoán.
+ const ontime=!stale&&!!dueDeadline&&(
+   (!!res&&res<dueDeadline) || (!res&&statusDone&&!historical&&now<dueDeadline)
+ );
+
+ // QUY TẮC QUÁ HẠN CHÍNH THỨC:
+ // Một Task đã vượt deadline mà không thuộc ngoại lệ Cập nhật muộn và không chứng minh được hoàn thành đúng hạn
+ // thì là Quá hạn, KỂ CẢ đã Done trong cùng tháng hoặc Done ở tháng sau.
+ const overdue=!stale&&!ontime&&!!dueDeadline&&dueDeadline<=asof;
+
+ // Hai nhánh con của Quá hạn, tính theo trạng thái tại mốc BSC của tháng gốc.
+ const late=overdue&&done;          // Quá hạn nhưng đã hoàn thành tại mốc BSC
+ const overdueOpen=overdue&&!done; // Quá hạn và chưa hoàn thành tại mốc BSC
+ const doing=!stale&&!ontime&&!overdue;
+
+ // Due 23/08: trong toàn bộ ngày 23/08 chưa quá hạn; từ 00:00 ngày 24/08 mới quá hạn.
  const todayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate());
  const daysToDue=dueStart?Math.floor((dueStart-todayStart)/86400000):9999;
- const soon=!done&&!historical&&daysToDue>=0&&daysToDue<=3;
- // Cập nhật muộn chỉ theo comment audit của trưởng nhóm.
- const stale=Boolean(x.lateUpdate);
- const daysLate=late?Math.max(1,Math.ceil((res-dueDeadline)/86400000)):overdue?Math.max(1,Math.ceil((asof-dueDeadline)/86400000)):0;
- return {...x,done,ontime,late,overdue,soon,stale,daysLate,bscAsOf:asof,weight:Number(x.weightOverride||WEIGHT[x.complexity]||1)}
+ const soon=doing&&!historical&&daysToDue>=0&&daysToDue<=3;
+
+ // Số ngày trễ theo ngày lịch: Due 21/08, Done 28/08 => 7 ngày.
+ // Nếu chưa Done tại mốc BSC thì tính tới ngày cuối cùng của mốc đánh giá, không lấy trạng thái tháng sau.
+ let daysLate=0;
+ if(overdue&&dueStart){
+   let endDate;
+   if(late&&res) endDate=new Date(res.getFullYear(),res.getMonth(),res.getDate());
+   else {
+     const ref=historical?new Date(asof.getTime()-1):now;
+     endDate=new Date(ref.getFullYear(),ref.getMonth(),ref.getDate());
+   }
+   daysLate=Math.max(1,Math.round((endDate-dueStart)/86400000));
+ }
+ return {...x,done,doneRecorded,ontime,late,overdue,overdueOpen,doing,soon,stale,daysLate,bscAsOf:asof,weight:Number(x.weightOverride||WEIGHT[x.complexity]||1)}
 }
 function filtersOk(x){return (!$("#assignee").value||x.assignee===$("#assignee").value)&&(!$("#epic").value||x.epic===$("#epic").value)&&(!$("#issueType").value||x.type===$("#issueType").value)}
 function calc(pidOverride=null){
  const old=$("#period").value;if(pidOverride)$("#period").value=pidOverride;
  let rows=DATA.filter(inPeriod).filter(filtersOk).map(x=>state(x));if(pidOverride)$("#period").value=old;
- const total=rows.length,done=rows.filter(x=>x.done).length,on=rows.filter(x=>x.ontime).length,late=rows.filter(x=>x.late).length,over=rows.filter(x=>x.overdue).length,soon=rows.filter(x=>x.soon).length,stale=rows.filter(x=>x.stale).length;
- const completion=total?100*done/total:0,ontime=done?100*on/done:0,work=rows.reduce((s,x)=>s+x.weight,0);
- return {rows,total,done,on,late,over,soon,stale,completion,ontime,work}
+ const total=rows.length,
+       done=rows.filter(x=>x.done).length,
+       on=rows.filter(x=>x.ontime).length,
+       late=rows.filter(x=>x.late).length,
+       overOpen=rows.filter(x=>x.overdueOpen).length,
+       over=rows.filter(x=>x.overdue).length,
+       doing=rows.filter(x=>x.doing).length,
+       soon=rows.filter(x=>x.soon).length,
+       stale=rows.filter(x=>x.stale).length;
+ const completion=total?100*done/total:0,
+       ontime=total?100*on/total:0,
+       overdueRate=total?100*over/total:0,
+       work=rows.reduce((s,x)=>s+x.weight,0),
+       classified=on+stale+over+doing;
+ return {rows,total,done,on,late,overOpen,over,doing,soon,stale,completion,ontime,overdueRate,work,classified}
 }
 function pct(n,d){return d?100*n/d:0}
 function delta(cur,prev,suf="%"){if(!prev)return "—";const v=100*(cur-prev)/prev;return `${v>=0?"↗":"↘"} ${Math.abs(v).toFixed(0)}${suf}`}
 function scoreClass(v){return v>=90?"p-good":v>=80?"p-mid":"p-bad"}
 function render(){
  const m=calc(),p=calc(prevPid());
- $("#kTotal").textContent=m.total;$("#kDone").textContent=m.done;$("#rDone").textContent=m.completion.toFixed(1)+"%";$("#kOntime").textContent=m.on;$("#rOntime").textContent=m.ontime.toFixed(1)+"%";$("#kOver").textContent=m.over;$("#rOver").textContent=pct(m.over,m.total).toFixed(1)+"%";$("#kSoon").textContent=m.soon;$("#rSoon").textContent=pct(m.soon,m.total).toFixed(1)+"%";$("#kStale").textContent=m.stale;$("#mTotal").style.width="100%";$("#mDone").style.width=Math.min(100,m.completion).toFixed(1)+"%";$("#mOntime").style.width=Math.min(100,m.ontime).toFixed(1)+"%";$("#mOver").style.width=Math.min(100,pct(m.over,m.total)).toFixed(1)+"%";$("#mSoon").style.width=Math.min(100,pct(m.soon,m.total)).toFixed(1)+"%";$("#mStale").style.width=Math.min(100,pct(m.stale,m.total)).toFixed(1)+"%";
- $("#dTotal").textContent=delta(m.total,p.total);$("#dDone").textContent=delta(m.done,p.done);$("#dOntime").textContent=delta(m.on,p.on);$("#dOver").textContent=delta(m.over,p.over);$("#dSoon").textContent=delta(m.soon,p.soon);$("#dStale").textContent=delta(m.stale,p.stale);
+ $("#kTotal").textContent=m.total;
+ $("#kDone").textContent=m.done;$("#rDone").textContent=m.completion.toFixed(1)+"%";
+ $("#kOntime").textContent=m.on;$("#rOntime").textContent=m.ontime.toFixed(1)+"%";
+ $("#kOver").textContent=m.over;$("#rOver").textContent=m.overdueRate.toFixed(1)+"%";
+ $("#kDoing").textContent=m.doing;$("#rDoing").textContent=pct(m.doing,m.total).toFixed(1)+"%";
+ $("#kStale").textContent=m.stale;
+ $("#mTotal").style.width="100%";
+ $("#mDone").style.width=Math.min(100,m.completion).toFixed(1)+"%";
+ $("#mOntime").style.width=Math.min(100,m.ontime).toFixed(1)+"%";
+ $("#mOver").style.width=Math.min(100,m.overdueRate).toFixed(1)+"%";
+ $("#mDoing").style.width=Math.min(100,pct(m.doing,m.total)).toFixed(1)+"%";
+ $("#mStale").style.width=Math.min(100,pct(m.stale,m.total)).toFixed(1)+"%";
+ $("#dTotal").textContent=delta(m.total,p.total);$("#dDone").textContent=delta(m.done,p.done);$("#dOntime").textContent=delta(m.on,p.on);$("#dOver").textContent=delta(m.over,p.over);$("#dDoing").textContent=delta(m.doing,p.doing);$("#dStale").textContent=delta(m.stale,p.stale);
  $("#aOver7").textContent=m.rows.filter(x=>x.overdue&&x.daysLate>7).length;$("#aSoon").textContent=m.soon;$("#aComplex").textContent=m.rows.filter(x=>x.complexity==="Very Complex"&&(x.overdue||x.soon)).length;$("#aStale").textContent=m.stale;
+ const chk=$("#classCheck");if(chk){chk.textContent=`${m.classified} / ${m.total}`;chk.style.color=m.classified===m.total?"#11875d":"#d14343";}
  renderStaff(m);renderDonut(m);renderRank(m);renderTasks(m);renderRange()
 }
 function renderRange(){const [s,e]=bounds();$("#rangeText").textContent=`${s.toLocaleDateString("vi-VN")} - ${e.toLocaleDateString("vi-VN")}`}
@@ -431,14 +489,15 @@ function renderStaff(m){
          done=a.filter(x=>x.done).length,
          on=a.filter(x=>x.ontime).length,
          late=a.filter(x=>x.late).length,
+         overOpen=a.filter(x=>x.overdueOpen).length,
          over=a.filter(x=>x.overdue).length,
          soon=a.filter(x=>x.soon).length,
          stale=a.filter(x=>x.stale).length,
          work=a.reduce((z,x)=>z+x.weight,0),
          completion=pct(done,total),
-         onr=pct(on,done),
-         later=pct(late,done);
-   return {name,total,done,on,late,onr,later,over,soon,stale,work,completion};
+         onr=pct(on,total),
+         overr=pct(over,total);
+   return {name,total,done,on,late,overOpen,onr,overr,over,soon,stale,work,completion};
  }).sort((a,b)=>b.onr-a.onr || a.over-b.over || a.name.localeCompare(b.name,"vi"));
 
  const statButton=(value,staff,kind,extraClass="") =>
@@ -451,8 +510,9 @@ function renderStaff(m){
      <td>${statButton(x.total,x.name,"all")}</td>
      <td>${statButton(x.done,x.name,"done")}</td>
      <td><button class="stat-jira ${x.on===0?"zero":""}" data-staff="${esc(x.name)}" data-kind="ontime"><span class="pct-pill ${scoreClass(x.onr)}">${x.onr.toFixed(1)}%</span></button></td>
-     <td><button class="stat-jira ${x.late===0?"zero":""}" data-staff="${esc(x.name)}" data-kind="late"><span class="pct-pill ${x.later>20?"p-bad":x.later>10?"p-mid":"p-good"}">${x.later.toFixed(1)}%</span></button></td>
-     <td>${statButton(x.over,x.name,"overdue")}</td>
+     <td><button class="stat-jira ${x.over===0?"zero":""}" data-staff="${esc(x.name)}" data-kind="overdue"><span class="pct-pill ${x.overr>20?"p-bad":x.overr>10?"p-mid":"p-good"}">${x.overr.toFixed(1)}%</span></button></td>
+     <td>${statButton(x.late,x.name,"late")}</td>
+     <td>${statButton(x.overOpen,x.name,"overdueOpen")}</td>
      <td>${statButton(x.soon,x.name,"soon")}</td>
      <td>${statButton(x.stale,x.name,"stale")}</td>
      <td><button class="stat-jira" data-staff="${esc(x.name)}" data-kind="all" title="Workload hiện chỉ hiển thị tham khảo, chưa dùng để tính BSC">${x.work}</button></td>
@@ -466,13 +526,25 @@ function renderStaff(m){
    if(kind==="done") rows=rows.filter(x=>x.done);
    else if(kind==="ontime") rows=rows.filter(x=>x.ontime);
    else if(kind==="late") rows=rows.filter(x=>x.late);
+   else if(kind==="overdueOpen") rows=rows.filter(x=>x.overdueOpen);
    else if(kind==="overdue") rows=rows.filter(x=>x.overdue);
    else if(kind==="soon") rows=rows.filter(x=>x.soon);
    else if(kind==="stale") rows=rows.filter(x=>x.stale);
    openRowsInJira(rows);
  });
 }
-function renderDonut(m){const total=Math.max(1,m.total),doing=m.rows.filter(x=>!x.done&&!x.overdue).length;let a=0;const vals=[m.on,m.late,m.over,doing],cs=["#18a86f","#f0aa26","#e45660","#2386d7"],st=[];vals.forEach((v,i)=>{const b=a+100*v/total;st.push(`${cs[i]} ${a}% ${b}%`);a=b});if(a<100)st.push(`#cbd6df ${a}% 100%`);$("#donut").style.background=`conic-gradient(${st.join(",")})`;$("#donutTotal").textContent=m.total;$("#lOn").textContent=m.on;$("#lLate").textContent=m.late;$("#lOver").textContent=m.over;$("#lDoing").textContent=doing;$("#donutDoneRate").textContent=m.completion.toFixed(1)+"%";$("#donutOnRate").textContent=m.ontime.toFixed(1)+"%"}
+function renderDonut(m){
+ const total=Math.max(1,m.total);let a=0;
+ // Donut chỉ dùng các nhóm LOẠI TRỪ LẪN NHAU: Đúng hạn + Cập nhật muộn + Quá hạn + Đang thực hiện.
+ const vals=[m.on,m.stale,m.over,m.doing],cs=["#18a86f","#8b5cf6","#e45660","#2386d7"],st=[];
+ vals.forEach((v,i)=>{const b=a+100*v/total;st.push(`${cs[i]} ${a}% ${b}%`);a=b});
+ if(a<100)st.push(`#cbd6df ${a}% 100%`);
+ $("#donut").style.background=`conic-gradient(${st.join(",")})`;
+ $("#donutTotal").textContent=m.total;$("#lOn").textContent=m.on;
+ if($("#lStaleDonut"))$("#lStaleDonut").textContent=m.stale;
+ $("#lOver").textContent=m.over;$("#lDoing").textContent=m.doing;
+ $("#donutDoneRate").textContent=m.completion.toFixed(1)+"%";$("#donutOnRate").textContent=m.ontime.toFixed(1)+"%"
+}
 function renderRank(m){
  const map={};
  m.rows.forEach(x=>{if(!(x.assignee in map))map[x.assignee]=0;if(x.overdue)map[x.assignee]++});
@@ -484,7 +556,7 @@ function renderRank(m){
 })
 }
 function impact(x){if(x.overdue||x.daysLate>7)return["Cao","tag-red"];if(x.soon||x.stale)return["Trung bình","tag-yellow"];return["Thấp","tag-green"]}
-function matchDetail(x){return detailFilter==="all"||detailFilter==="ontime"&&x.ontime||detailFilter==="late"&&x.late||detailFilter==="overdue"&&x.overdue||detailFilter==="soon"&&x.soon||detailFilter==="stale"&&x.stale}
+function matchDetail(x){return detailFilter==="all"||detailFilter==="ontime"&&x.ontime||detailFilter==="late"&&x.late||detailFilter==="overdueOpen"&&x.overdueOpen||detailFilter==="overdue"&&x.overdue||detailFilter==="soon"&&x.soon||detailFilter==="stale"&&x.stale}
 function renderTasks(m){
  const allRows=m.rows.filter(matchDetail).sort((a,b)=>(b.daysLate||0)-(a.daysLate||0));
  const totalRows=allRows.length;
@@ -500,7 +572,7 @@ function renderTasks(m){
 
  $("#taskBody").innerHTML=rows.map(x=>{
    const [imp,ic]=impact(x),
-         stat=x.status==="Done"?["Done","tag-green"]:x.overdue?["In Progress","tag-red"]:["In Progress","tag-blue"];
+         stat=x.stale?["Cập nhật muộn","tag-yellow"]:x.ontime?["Đúng hạn","tag-green"]:x.late?["Quá hạn – đã HT","tag-red"]:x.overdueOpen?["Quá hạn – chưa HT tại mốc","tag-red"]:[x.status||"Đang thực hiện","tag-blue"];
    return `<tr>
      <td><a class="issue-link" href="${JIRA_BASE_URL}/browse/${encodeURIComponent(x.key)}" target="_blank">${esc(x.key)}</a></td>
      <td>${esc(x.summary)}</td>
@@ -552,16 +624,17 @@ function rowsForKind(m,kind){
  if(kind==="done") return m.rows.filter(x=>x.done);
  if(kind==="ontime") return m.rows.filter(x=>x.ontime);
  if(kind==="late") return m.rows.filter(x=>x.late);
+ if(kind==="overdueOpen") return m.rows.filter(x=>x.overdueOpen);
  if(kind==="overdue") return m.rows.filter(x=>x.overdue);
  if(kind==="soon") return m.rows.filter(x=>x.soon);
- if(kind==="doing") return m.rows.filter(x=>!x.done&&!x.overdue);
+ if(kind==="doing") return m.rows.filter(x=>x.doing);
  if(kind==="stale") return m.rows.filter(x=>x.stale);
  if(kind==="over7") return m.rows.filter(x=>x.overdue&&x.daysLate>7);
  if(kind==="veryComplex") return m.rows.filter(x=>x.complexity==="Very Complex"&&(x.overdue||x.soon));
  return m.rows;
 }
 
-function jqlForKind(kind){const p=$("#period").value;let clauses=['project = "BANCORE"'];if($("#assignee").value)clauses.push(`assignee = "${$("#assignee").value}"`);if($("#issueType").value)clauses.push(`issuetype = "${$("#issueType").value}"`);if(kind==="done")clauses.push("statusCategory = Done");if(kind==="ontime")clauses.push("statusCategory = Done");if(kind==="overdue")clauses.push("duedate < now()","statusCategory != Done");if(kind==="soon")clauses.push("duedate >= now()","duedate <= 3d","statusCategory != Done");return clauses.join(" AND ")}
+function jqlForKind(kind){const p=$("#period").value;let clauses=['project = "BANCORE"'];if($("#assignee").value)clauses.push(`assignee = "${$("#assignee").value}"`);if($("#issueType").value)clauses.push(`issuetype = "${$("#issueType").value}"`);if(kind==="done")clauses.push("statusCategory = Done");if(kind==="ontime")clauses.push("statusCategory = Done");if(kind==="overdue")clauses.push("duedate < now()");if(kind==="soon")clauses.push("duedate >= now()","duedate <= 3d","statusCategory != Done");return clauses.join(" AND ")}
 $$(".kpi").forEach(k=>k.onclick=()=>{
  const m=calc(),kind=k.dataset.kind;
  openRowsInJira(rowsForKind(m,kind));
