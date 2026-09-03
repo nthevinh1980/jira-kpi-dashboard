@@ -12,7 +12,7 @@ import streamlit.components.v1 as components
 from jira_client import JiraApiError, JiraClient
 
 
-APP_VERSION = "9.0-bsc-period-lock"
+APP_VERSION = "10.1-monthly-bsc-locked"
 DEFAULT_JQL = 'project = "BANCORE" AND parentEpic IN (BANCORE-7559) AND issuetype = Task ORDER BY duedate ASC'
 
 st.set_page_config(
@@ -125,7 +125,8 @@ def build_row(
         late_update_author = str(late_marker.get("author") or "")
 
     due = iso_date(f.get("duedate"))
-    resolution = iso_date(f.get("resolutiondate"))
+    resolution_raw = str(f.get("resolutiondate") or "")
+    resolution = iso_date(resolution_raw)
     created = iso_date(f.get("created"))
 
     # BSC PERIOD LOCK:
@@ -153,6 +154,7 @@ def build_row(
         "type": str(issue_type.get("name") or ""),
         "due": due,
         "resolution": resolution,
+        "resolutionAt": resolution_raw,
         "created": created,
         "reportDate": report_date,
         "periodBasis": period_basis,
@@ -200,12 +202,6 @@ def load_dashboard_data(
         ],
     )
 
-    if not division_id:
-        raise JiraApiError(
-            "Không tìm thấy custom field 'Division of CoreBanking' trên Jira. "
-            "Hãy kiểm tra đúng tên field đang hiển thị trên Task."
-        )
-
     fields = [
         "summary", "assignee", "status", "issuetype", "duedate",
         "resolutiondate", "created", "updated", "labels", "components", "parent",
@@ -214,12 +210,18 @@ def load_dashboard_data(
         if fid and fid not in fields:
             fields.append(fid)
 
-    # Nguồn 1: Epic BANCORE nhưng CHỈ lấy Task có Division of CoreBanking = Fusion&QA.
+    # Nguồn 1 BSC: JQL chỉ xác định TẬP CÔNG VIỆC GỐC (ví dụ Epic 7559).
+    # Không được âm thầm loại Task chỉ vì Division bị trống/đổi sau này, vì sẽ làm sai BSC lịch sử.
+    # Nếu thực sự cần khóa theo Division, bật JIRA_STRICT_DIVISION_FILTER=true trong Secrets.
     main_all = client.search_issues(main_jql, fields, page_size=100, max_issues=10000)
-    main_issues = [
-        issue for issue in main_all
-        if value_matches((issue.get("fields") or {}).get(division_id), division_value)
-    ]
+    strict_division_filter = secret("JIRA_STRICT_DIVISION_FILTER", "false").strip().lower() in {"1", "true", "yes", "y"}
+    if strict_division_filter and division_id:
+        main_issues = [
+            issue for issue in main_all
+            if value_matches((issue.get("fields") or {}).get(division_id), division_value)
+        ]
+    else:
+        main_issues = list(main_all)
 
     # Nguồn 2: Cầu ở project khác.
     # JQL này nên là base query, không giới hạn tuần, để Dashboard tự lọc Tháng/Quý/Năm.
@@ -245,7 +247,13 @@ def load_dashboard_data(
     comment_map: dict[str, Any] = {}
     if sync_comments and combined:
         keys = [str(issue.get("key") or "") for issue, _ in combined if issue.get("key")]
-        comment_map = client.comments_audit_bulk(keys, late_update_marker=late_update_marker, reviewer_account_id=me.account_id, workers=8)
+        reviewer_account_id = secret("JIRA_LATE_UPDATE_REVIEWER_ACCOUNT_ID", "").strip()
+        comment_map = client.comments_audit_bulk(
+            keys,
+            late_update_marker=late_update_marker,
+            reviewer_account_id=reviewer_account_id,
+            workers=8,
+        )
 
     rows = [
         build_row(
@@ -270,6 +278,7 @@ def load_dashboard_data(
         "division_value": division_value,
         "main_before_division": len(main_all),
         "main_after_division": len(main_issues),
+        "strict_division_filter": strict_division_filter,
         "caunn_count": len(caunn_issues),
         "combined_count": len(rows),
     }
@@ -291,11 +300,20 @@ caunn_jql = secret(
     'project = "2024.PS006_Xây dựng ứng dụng tác nghiệp tập trung tại quầy" '
     'AND assignee = 712020:c282b441-9290-4c08-bc66-d834b94e17a7 '
     'AND issuetype = Sub-task '
-    'AND status IN (Done, Closed, Resolved) '
-    'ORDER BY resolved DESC'
+    'ORDER BY duedate ASC'
 )
 caunn_default_weight = int(secret("JIRA_CAUNN_DEFAULT_WEIGHT", "1") or "1")
 
+
+# JQL nguồn BSC không nên lọc theo trạng thái/ngày hiện tại. Nếu lọc status/resolved/duedate theo thời gian,
+# Task quá hạn của tháng cũ có thể biến mất sau khi Jira được Done ở tháng sau.
+_jql_l = jql.lower()
+_risky_tokens = ["status =", "status in", "statuscategory", "resolutiondate", "resolved >=", "resolved <=", "duedate >=", "duedate <=", "created >=", "created <="]
+if any(t in _jql_l for t in _risky_tokens):
+    st.warning(
+        "JIRA_DEFAULT_JQL đang có điều kiện trạng thái/ngày. Với BSC lịch sử, JQL nguồn nên chỉ xác định project/epic/issuetype; "
+        "việc lọc tháng và trạng thái phải để Dashboard thực hiện theo Due date + mốc BSC."
+    )
 
 if not base_url or not email or not token:
     st.error(
