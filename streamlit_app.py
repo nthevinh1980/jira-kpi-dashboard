@@ -12,7 +12,7 @@ import streamlit.components.v1 as components
 from jira_client import JiraApiError, JiraClient
 
 
-APP_VERSION = "8.2"
+APP_VERSION = "9.0-bsc-period-lock"
 DEFAULT_JQL = 'project = "BANCORE" AND parentEpic IN (BANCORE-7559) AND issuetype = Task ORDER BY duedate ASC'
 
 st.set_page_config(
@@ -109,24 +109,30 @@ def build_row(
     if not complexity:
         complexity = "Không phân loại"
 
-    comment = comment_map.get(str(issue.get("key") or ""))
+    comment_audit = comment_map.get(str(issue.get("key") or ""))
     comment_date = ""
-    if isinstance(comment, dict) and not comment.get("error"):
-        comment_date = iso_date(comment.get("created"))
+    comment_author = ""
+    late_update = False
+    late_update_date = ""
+    late_update_author = ""
+    if isinstance(comment_audit, dict) and not comment_audit.get("error"):
+        latest = comment_audit.get("latest") or {}
+        late_marker = comment_audit.get("lateUpdateComment") or {}
+        comment_date = iso_date(latest.get("created"))
+        comment_author = str(latest.get("author") or "")
+        late_update = bool(comment_audit.get("lateUpdate"))
+        late_update_date = iso_date(late_marker.get("created"))
+        late_update_author = str(late_marker.get("author") or "")
 
     due = iso_date(f.get("duedate"))
     resolution = iso_date(f.get("resolutiondate"))
     created = iso_date(f.get("created"))
 
-    # Quy tắc kỳ báo cáo:
-    # - Nhóm Fusion&QA: ưu tiên Due date.
-    # - Cầu ở project khác: ưu tiên Resolution date, đúng với JQL báo cáo tuần của Cầu.
-    if source == "CAUNN":
-        report_date = resolution or due or created
-        period_basis = "Resolution date" if resolution else ("Due date" if due else "Created")
-    else:
-        report_date = due or resolution or created
-        period_basis = "Due date" if due else ("Resolution date" if resolution else "Created")
+    # BSC PERIOD LOCK:
+    # Mỗi Task chỉ thuộc duy nhất kỳ BSC theo Due date.
+    # Resolution date / Created KHÔNG được dùng để chuyển Task sang tháng khác.
+    report_date = due
+    period_basis = "Due date (BSC locked)" if due else "Không có Due date"
 
     return {
         "key": str(issue.get("key") or ""),
@@ -154,17 +160,22 @@ def build_row(
         "statusCategory": str(status_category.get("key") or ""),
         "updated": iso_date(f.get("updated")),
         "comment": comment_date,
+        "commentAuthor": comment_author,
+        "lateUpdate": late_update,
+        "lateUpdateDate": late_update_date,
+        "lateUpdateAuthor": late_update_author,
         "labels": [str(x) for x in (f.get("labels") or [])],
     }
 
 
-@st.cache_data(ttl=900, show_spinner=False)
+@st.cache_data(ttl=300, show_spinner=False)
 def load_dashboard_data(
     base_url: str,
     email: str,
     token: str,
     main_jql: str,
     sync_comments: bool,
+    late_update_marker: str,
     division_value: str,
     caunn_jql: str,
     caunn_default_weight: int,
@@ -234,7 +245,7 @@ def load_dashboard_data(
     comment_map: dict[str, Any] = {}
     if sync_comments and combined:
         keys = [str(issue.get("key") or "") for issue, _ in combined if issue.get("key")]
-        comment_map = client.latest_comments_bulk(keys, workers=8)
+        comment_map = client.comments_audit_bulk(keys, late_update_marker=late_update_marker, reviewer_account_id=me.account_id, workers=8)
 
     rows = [
         build_row(
@@ -269,7 +280,7 @@ email = secret("JIRA_EMAIL")
 token = secret("JIRA_API_TOKEN")
 jql = secret("JIRA_DEFAULT_JQL", DEFAULT_JQL)
 sync_comments = secret("JIRA_SYNC_COMMENTS", "true").strip().lower() in {"1", "true", "yes", "y"}
-target_workload = int(secret("JIRA_TARGET_WORKLOAD_MONTH", "20") or "20")
+late_update_marker = secret("JIRA_LATE_UPDATE_MARKER", "cập nhật muộn")
 
 # Lọc nhóm theo custom field của Task, không lọc theo tên cán bộ nữa.
 division_value = secret("JIRA_DIVISION_VALUE", "Fusion&QA")
@@ -295,7 +306,7 @@ if not base_url or not email or not token:
 
 try:
     with st.spinner("Đang đồng bộ dữ liệu Jira..."):
-        payload = load_dashboard_data(base_url, email, token, jql, sync_comments, division_value, caunn_jql, caunn_default_weight)
+        payload = load_dashboard_data(base_url, email, token, jql, sync_comments, late_update_marker, division_value, caunn_jql, caunn_default_weight)
 except JiraApiError as exc:
     st.error(f"Lỗi Jira API: {exc}")
     st.stop()
@@ -318,7 +329,6 @@ base_json = json.dumps(base_url.rstrip("/"), ensure_ascii=False)
 
 page = page.replace("__JIRA_DATA__", data_json)
 page = page.replace("__JIRA_BASE_URL__", base_json)
-page = page.replace("__TARGET_WORKLOAD_MONTH__", str(target_workload))
 page = page.replace("__SYNC_TIME__", payload["loaded_at"])
 
 # 2550 đủ cho dashboard desktop; bên trong iframe vẫn cuộn được.
