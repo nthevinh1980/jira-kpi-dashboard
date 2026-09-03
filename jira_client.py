@@ -1,4 +1,4 @@
-from __future__ import annotations
+
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -75,7 +75,7 @@ class JiraClient:
         self.session.headers.update({
             "Accept": "application/json",
             "Content-Type": "application/json",
-            "User-Agent": "Jira-BSC-Executive/6.0",
+            "User-Agent": "Jira-BSC-Executive/9.1",
         })
 
     def _request(self, method: str, path: str, **kwargs) -> requests.Response:
@@ -312,15 +312,4 @@ class JiraClient:
                 result[key] = {"error": audit["error"]}
             else:
                 result[key] = audit.get("latest")
-        return result
-
-        workers = max(1, min(int(workers), 12))
-        with ThreadPoolExecutor(max_workers=workers) as executor:
-            futures = {executor.submit(self.latest_comment, key): key for key in keys}
-            for future in as_completed(futures):
-                key = futures[future]
-                try:
-                    result[key] = future.result()
-                except Exception as exc:
-                    result[key] = {"error": str(exc)}
         return result
