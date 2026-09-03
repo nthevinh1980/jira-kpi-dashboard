@@ -138,6 +138,234 @@ table{border-collapse:collapse;width:100%;font-size:9px}th{background:#f8fafc;co
 .stat-jira.zero{color:#7f92a1;text-decoration:none}
 .stat-jira.zero:hover{background:#f1f4f6;color:#637786}
 
+
+/* ===== V10.2 POLISHED UI ===== */
+:root{
+  --bidv:#087565;
+  --bidv-2:#0b8a78;
+  --bidv-soft:#eaf7f4;
+  --navy:#17324a;
+  --bg:#f3f6f8;
+  --line:#e1e8ee;
+  --text:#1d3448;
+  --muted:#7a8e9f;
+  --shadow:0 8px 26px rgba(28,54,78,.055),0 2px 7px rgba(28,54,78,.035);
+}
+body{background:linear-gradient(180deg,#f7fafb 0,#f3f6f8 48%,#f5f7f9 100%)}
+.sidebar{background:linear-gradient(180deg,#075f54 0%,#087565 52%,#075f54 100%);box-shadow:5px 0 22px rgba(7,73,64,.10)}
+.topbar{height:72px;padding:0 24px;border-bottom-color:#e4ebef;box-shadow:0 2px 12px rgba(29,56,80,.03)}
+.title{font-size:17px;letter-spacing:.02em}.subtitle{font-size:10.5px}
+.content{padding:16px 22px 30px;max-width:1880px}
+.filters{border-radius:16px;padding:13px 14px;gap:11px;box-shadow:var(--shadow);border-color:#e2e9ee}
+.f label{font-size:9.3px;color:#6d8395;margin-bottom:6px}.f select{height:36px;border-radius:9px;border-color:#dfe7ed;background:#fbfdfe;font-size:10px}
+.refresh{height:36px;border-color:#8fc8bc;background:#f8fffd;border-radius:10px;padding:0 15px}
+.kpis{gap:12px;margin-top:13px}
+.kpi{min-height:148px;border-radius:18px;padding:16px 15px 13px;border-color:#e1e8ed;box-shadow:var(--shadow)}
+.kpi:before{height:3px;opacity:.9}.kpi-icon{width:38px;height:38px;border-radius:12px}.kpi-icon svg{width:18px;height:18px}
+.kpi-label{font-size:9.7px;letter-spacing:.025em}.kpi-val{font-size:32px}.kpi-rate{font-size:11px}.kpi-bottom{margin-top:9px;padding-top:9px}.kpi-meter{height:4px}
+.card{border-radius:16px;padding:14px;border-color:#e1e8ed;box-shadow:var(--shadow);height:auto;background:rgba(255,255,255,.97)}
+.card-title{font-size:11.2px;letter-spacing:.015em;color:#203d54}.card-sub{font-size:9.2px;color:#8194a3}
+.attention-grid{grid-template-columns:minmax(0,1.45fr) minmax(420px,.72fr);gap:12px;margin-top:12px;align-items:start}
+.attention-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:11px}
+.alert-card{min-height:86px;border-radius:13px;padding:11px 12px;grid-template-columns:38px minmax(0,1fr);gap:10px;background:linear-gradient(180deg,#fff,#fbfdfe)}
+.alert-ico{width:38px;height:38px;border-radius:11px}.alert-card b{font-size:23px}.alert-card p{font-size:8.7px}.alert-card a{font-size:8.3px}
+.thresholds{grid-template-columns:1fr 1fr;gap:8px;margin-top:11px}.threshold{min-height:39px;border-radius:10px;padding:7px 8px;font-size:8.4px;background:#fafcfd}.threshold:last-child{grid-column:1/-1}.threshold strong{font-size:8px;padding:4px 7px;background:#eaf7f4;color:#176456}
+.performance{display:grid;grid-template-columns:1fr;gap:12px;margin-top:12px;align-items:start}
+.insights-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:stretch}
+.insight-card{min-height:278px}.staff-performance-card{padding-bottom:12px}
+.section-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.section-badge{font-size:8px;font-weight:900;color:#176456;background:#eaf7f4;border:1px solid #d5eee8;padding:5px 8px;border-radius:999px;white-space:nowrap}.section-badge.danger{color:#b84551;background:#fff0f2;border-color:#f8d6da}
+.staff-table-wrap{margin-top:11px;border-radius:12px;overflow:auto;border-color:#e5ebef}
+.staff-table-wrap table{font-size:9.6px;min-width:980px}.staff-table-wrap th{padding:10px 8px;background:#f6f9fb;color:#5c7387}.staff-table-wrap td{padding:10px 8px}
+.donut-wrap{margin-top:18px;min-height:170px;gap:30px}.donut{width:158px;height:158px;box-shadow:inset 0 0 0 1px rgba(22,69,95,.04)}.donut:after{inset:31px}.donut-center strong{font-size:29px}.legend{gap:11px;font-size:9.5px;min-width:160px}.leg{padding:6px 7px}.leg strong{font-size:12px}
+.rate-pairs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.rate-card{border-radius:11px;padding:10px 12px;text-align:center;border:1px solid}.rate-card span{display:block;font-size:8.5px;margin-bottom:3px}.rate-card strong{font-size:16px}.rate-green{background:#f5fbf9;border-color:#deeee9;color:#16845d}.rate-green span{color:#789387}.rate-blue{background:#f5f9fd;border-color:#dfeaf3;color:#176fbd}.rate-blue span{color:#7b8f9f}
+.rank-list{margin-top:15px;min-height:205px;gap:13px;justify-content:center}.rank-row{grid-template-columns:145px 1fr 28px;font-size:8.7px}.track{height:9px}
+.detail{margin-top:12px}.detail-head{gap:12px}.detail-table{font-size:9.2px}
+.footer-note{margin-top:12px;border-radius:11px;background:#f8fbfc;border:1px solid #e5edf1;padding:10px 12px;display:grid;grid-template-columns:1.25fr .75fr;gap:14px;color:#6e8394}
+@media(max-width:1400px){.attention-grid{grid-template-columns:1fr}.attention-list{grid-template-columns:repeat(4,1fr)}.thresholds{grid-template-columns:repeat(3,1fr)}.threshold:last-child{grid-column:auto}.insights-grid{grid-template-columns:1fr 1fr}.kpis{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:1000px){.attention-list{grid-template-columns:repeat(2,1fr)}.thresholds{grid-template-columns:1fr 1fr}.insights-grid{grid-template-columns:1fr}.footer-note{grid-template-columns:1fr}.filters{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:700px){.kpis{grid-template-columns:repeat(2,1fr)}.attention-list,.thresholds{grid-template-columns:1fr}.filters{grid-template-columns:repeat(2,1fr)}.content{padding:10px}.topbar{padding:10px 12px}}
+
+
+/* ===== V10.3 CORE BANKING TECHNOLOGY UI ===== */
+:root{
+  --core-navy:#0b2438;
+  --core-navy-2:#103a51;
+  --core-teal:#00a889;
+  --core-teal-2:#12bfa1;
+  --core-cyan:#1b9cf0;
+  --core-blue:#2667d8;
+  --core-green:#13a76f;
+  --core-gold:#e9a318;
+  --core-red:#e54b5b;
+  --core-violet:#7559d5;
+  --core-bg:#f3f7fa;
+  --core-line:#dde7ee;
+}
+body{
+  background:
+    linear-gradient(rgba(19,70,95,.023) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(19,70,95,.023) 1px,transparent 1px),
+    radial-gradient(circle at 88% 3%,rgba(27,156,240,.08),transparent 21%),
+    radial-gradient(circle at 12% 0%,rgba(0,168,137,.07),transparent 24%),
+    #f4f8fb;
+  background-size:28px 28px,28px 28px,auto,auto,auto;
+}
+.sidebar{
+  background:
+    radial-gradient(circle at 50% 5%,rgba(36,200,173,.28),transparent 25%),
+    linear-gradient(180deg,#071d30 0%,#0b3144 49%,#075a55 100%);
+  box-shadow:7px 0 28px rgba(4,35,52,.16);
+}
+.brand{
+  background:linear-gradient(145deg,rgba(255,255,255,.18),rgba(255,255,255,.07));
+  border:1px solid rgba(255,255,255,.16);
+  box-shadow:0 9px 24px rgba(0,0,0,.14),inset 0 0 18px rgba(255,255,255,.06);
+}
+.nav-btn{color:#dceaf2}
+.nav-btn:hover,.nav-btn.active{
+  background:linear-gradient(135deg,rgba(22,191,161,.28),rgba(37,126,194,.22));
+  box-shadow:inset 0 0 0 1px rgba(127,236,218,.12);
+}
+.topbar{
+  background:rgba(255,255,255,.94);
+  border-bottom:1px solid #dfe8ee;
+  box-shadow:0 5px 20px rgba(16,48,70,.045);
+}
+.topbar:after{
+  content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;
+  background:linear-gradient(90deg,var(--core-teal),var(--core-cyan),transparent 70%);
+  opacity:.72;
+}
+.title{color:var(--core-navy);font-size:17.5px}
+.subtitle{color:#728a9a}
+.core-logo{
+  width:39px;height:39px;border-radius:12px;
+  color:#087c72;background:linear-gradient(145deg,#e6fbf6,#edf6ff);
+  box-shadow:inset 0 0 0 1px #d4eee8,0 4px 12px rgba(0,137,120,.10)
+}
+.core-logo svg{width:22px;height:22px;stroke-width:1.75}
+.core-badge{
+  padding:6px 9px;border-radius:999px;font-size:8px;font-weight:950;letter-spacing:.09em;
+  color:#087765;background:linear-gradient(90deg,#e5faf5,#eaf5ff);
+  border:1px solid #d1ece6;white-space:nowrap
+}
+.filters{
+  border-color:#dce7ed;
+  background:rgba(255,255,255,.94);
+  box-shadow:0 10px 28px rgba(24,55,78,.055);
+}
+.f select{background:linear-gradient(180deg,#fff,#f9fcfe)}
+.refresh{
+  color:#087765;border-color:#94d1c6;background:linear-gradient(180deg,#fff,#f3fcfa);
+  box-shadow:0 3px 10px rgba(0,121,104,.06)
+}
+.kpis{gap:13px}
+.kpi{
+  min-height:154px;border-radius:18px;border-color:#dfe8ee;
+  background:
+    radial-gradient(circle at 92% 12%,color-mix(in srgb,var(--c) 10%,transparent),transparent 33%),
+    linear-gradient(165deg,#fff 0%,#fbfdff 70%,var(--soft) 170%);
+  box-shadow:0 9px 26px rgba(22,52,76,.055),0 2px 8px rgba(22,52,76,.035);
+}
+.kpi:after{
+  content:"";position:absolute;right:-24px;bottom:-30px;width:80px;height:80px;border-radius:50%;
+  border:1px solid color-mix(in srgb,var(--c) 14%,transparent);
+  box-shadow:0 0 0 13px color-mix(in srgb,var(--c) 4%,transparent);
+  pointer-events:none
+}
+.kpi:hover{transform:translateY(-3px);box-shadow:0 16px 35px rgba(21,53,78,.10)}
+.kpi-icon{
+  width:42px;height:42px;border-radius:13px;
+  background:linear-gradient(145deg,#fff,var(--soft));
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 16%,transparent),0 6px 15px color-mix(in srgb,var(--c) 13%,transparent)
+}
+.kpi-icon svg{width:21px;height:21px;stroke-width:1.8}
+.kpi-val{font-size:33px}
+.k-blue{--c:#246cc8;--soft:#eaf3ff}
+.k-green{--c:#0d9a67;--soft:#e7f8ef}
+.k-cyan{--c:#0b91ab;--soft:#e5f7fa}
+.k-red{--c:#df4e5b;--soft:#ffedef}
+.k-amber{--c:#d89410;--soft:#fff5dd}
+.k-violet{--c:#6f51c7;--soft:#f1edfc}
+
+.card{
+  border-color:#dfe8ed;border-radius:17px;
+  box-shadow:0 10px 30px rgba(22,52,76,.05),0 2px 7px rgba(22,52,76,.03);
+}
+.card-title{
+  color:#173b54;letter-spacing:.025em;
+  display:flex;align-items:center;gap:7px
+}
+.card-title:before{
+  content:"";width:7px;height:7px;border-radius:2px;
+  background:linear-gradient(135deg,var(--core-teal),var(--core-cyan));
+  box-shadow:0 0 0 4px rgba(0,168,137,.08);
+  flex:0 0 auto
+}
+.attention-grid{gap:14px}
+.alert-card{
+  border-color:#e1e9ee;position:relative;overflow:hidden;
+  background:
+    radial-gradient(circle at 95% 10%,rgba(31,156,240,.04),transparent 28%),
+    linear-gradient(180deg,#fff,#fbfdff)
+}
+.alert-card:before{
+  content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 6px 6px 0;background:#b6c6d0
+}
+.a-red:before{background:var(--core-red)}
+.a-amber:before{background:var(--core-gold)}
+.a-blue:before{background:var(--core-cyan)}
+.a-violet:before{background:var(--core-violet)}
+.alert-ico{box-shadow:inset 0 0 0 1px rgba(31,62,84,.035)}
+.threshold{
+  background:linear-gradient(180deg,#fbfdfe,#f8fbfc);
+  border-color:#e5edf1
+}
+.threshold strong{
+  background:linear-gradient(90deg,#e7f7f3,#edf7ff);
+  color:#11675d;border:1px solid #d9eee9
+}
+.section-badge{
+  background:linear-gradient(90deg,#e7f8f4,#edf7ff);
+  color:#10695e;border-color:#d7ede8
+}
+.staff-table-wrap th{
+  background:linear-gradient(180deg,#f6fafc,#f2f7fa);
+  color:#526f83;border-bottom-color:#dfe8ee
+}
+.staff-table-wrap tbody tr:nth-child(even){background:#fbfdfe}
+.staff-table-wrap tbody tr:hover{
+  background:linear-gradient(90deg,#f0faf7,#f5faff);
+  box-shadow:inset 3px 0 0 var(--core-teal)
+}
+.donut{
+  filter:drop-shadow(0 9px 15px rgba(16,55,81,.08));
+  background:conic-gradient(#10a574 0 72%,#7358d5 72% 84%,#e65360 84% 90%,#2388d8 90%)
+}
+.rate-card{box-shadow:0 4px 13px rgba(20,52,74,.035)}
+.rank-row .track{background:#edf2f5}
+.detail{
+  border-top:3px solid transparent;
+  border-image:linear-gradient(90deg,var(--core-teal),var(--core-cyan),transparent) 1;
+}
+.chip.active{
+  background:linear-gradient(90deg,#0b806f,#0b9d8a);
+  border-color:#0b806f;color:#fff
+}
+.footer-note{
+  background:
+    linear-gradient(90deg,rgba(0,168,137,.045),rgba(27,156,240,.035)),
+    #fbfdfe;
+  border-color:#dfe9ee
+}
+.live i{background:#0fbd81;box-shadow:0 0 0 4px #e1f8ef,0 0 12px rgba(15,189,129,.3)}
+.range{background:#fbfdfe}
+.export{
+  color:#087766;border-color:#bddfd8;background:linear-gradient(180deg,#fff,#f4fcfa)
+}
+@media(max-width:1120px){.core-badge{display:none}}
+
 </style>
 </head>
 <body>
@@ -149,7 +377,7 @@ table{border-collapse:collapse;width:100%;font-size:9px}th{background:#f8fafc;co
   <nav class="nav">
     <button class="nav-btn active" data-target="overview"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span>Tổng quan</span></button>
     <button class="nav-btn" data-target="staffSec"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2"/><path d="M3 20c0-4 2.5-7 6-7s6 3 6 7M14 14c3 0 5 2 5 5"/></svg><span>Cán bộ</span></button>
-    <button class="nav-btn" data-target="detailSec"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span>Công việc</span></button>
+    <button class="nav-btn" data-target="detailSec"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v5c0 1.7 3.1 3 7 3s7-1.3 7-3V5M5 10v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/><path d="M8 20h8M12 18v2"/></svg><span>Công việc</span></button>
     <button class="nav-btn" data-target="staffSec"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg><span>Báo cáo</span></button>
     <button class="nav-btn" data-target="alertSec"><svg viewBox="0 0 24 24"><path d="M12 3 3 20h18z"/><path d="M12 9v5M12 17h.01"/></svg><span>Cảnh báo</span></button>
     <button class="nav-btn" data-target="overview"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21h-4v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H3v-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6V3h4v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.1v4H21a1.7 1.7 0 0 0-1.6 1z"/></svg><span>Cài đặt</span></button>
@@ -160,10 +388,13 @@ table{border-collapse:collapse;width:100%;font-size:9px}th{background:#f8fafc;co
 <main class="main">
 <header class="topbar">
   <div class="title-wrap">
-    <div class="mini-logo"><svg viewBox="0 0 24 24"><path d="M5 18V9M12 18V5M19 18v-7"/></svg></div>
-    <div><div class="title">JIRA BSC EXECUTIVE DASHBOARD</div><div class="subtitle">Dashboard quản lý công việc và hiệu suất cán bộ</div></div>
+    <div class="mini-logo core-logo"><svg viewBox="0 0 24 24" aria-hidden="true">
+<ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v5c0 1.7 3.1 3 7 3s7-1.3 7-3V5M5 10v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/>
+<path d="M9 21h6M12 18v3"/>
+</svg></div>
+    <div><div class="title">JIRA BSC • CORE BANKING DELIVERY</div><div class="subtitle">Theo dõi vận hành, delivery, SLA và chất lượng thực thi trên Jira</div></div>
   </div>
-  <div class="top-actions">
+  <div class="top-actions"><span class="core-badge">CORE BANKING</span>
     <div class="live"><i></i><span><strong>Jira API · LIVE</strong><br/>Cập nhật gần nhất: <span id="syncTime">__SYNC_TIME__</span></span></div>
     <div class="range">Kỳ báo cáo: <strong id="rangeText">01/08/2026 - 31/08/2026</strong></div>
     <button class="export" id="exportBtn">⇩ Xuất báo cáo</button>
@@ -181,13 +412,13 @@ table{border-collapse:collapse;width:100%;font-size:9px}th{background:#f8fafc;co
 </section>
 <div style="margin:7px 2px 0;font-size:8.5px;color:#71889a;display:flex;align-items:center;gap:5px">
   <span style="width:7px;height:7px;border-radius:50%;background:#008b78;display:inline-block"></span>
-  Mọi số lượng/KPI màu xanh có thể bấm để mở đúng tập Issue Key trên Jira, phục vụ đối soát số liệu Dashboard ↔ Jira.
+  <strong>Core Banking Control:</strong> Mọi số lượng/KPI có thể bấm để mở đúng tập Issue Key trên Jira, phục vụ đối soát Dashboard ↔ Jira theo từng kỳ BSC.
 </div>
 
 <section class="kpis" id="kpiSec">
   <div class="kpi k-blue" data-kind="all">
     <div>
-      <div class="kpi-head"><span class="kpi-label">Tổng công việc</span><span class="kpi-icon"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span></div>
+      <div class="kpi-head"><span class="kpi-label">Tổng công việc</span><span class="kpi-icon"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v5c0 1.7 3.1 3 7 3s7-1.3 7-3V5M5 10v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/><path d="M8 20h8M12 18v2"/></svg></span></div>
       <div class="kpi-val" id="kTotal">0</div>
       <div class="kpi-rate">Khối lượng trong kỳ</div>
     </div>
@@ -199,7 +430,7 @@ table{border-collapse:collapse;width:100%;font-size:9px}th{background:#f8fafc;co
   </div>
   <div class="kpi k-green" data-kind="done">
     <div>
-      <div class="kpi-head"><span class="kpi-label">Hoàn thành</span><span class="kpi-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16.5 8"/></svg></span></div>
+      <div class="kpi-head"><span class="kpi-label">Hoàn thành</span><span class="kpi-icon"><svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.7 2.8 8.1 7 10 4.2-1.9 7-5.3 7-10V6z"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg></span></div>
       <div class="kpi-val" id="kDone">0</div>
       <div class="kpi-rate" id="rDone">0%</div>
     </div>
@@ -211,7 +442,7 @@ table{border-collapse:collapse;width:100%;font-size:9px}th{background:#f8fafc;co
   </div>
   <div class="kpi k-cyan" data-kind="ontime">
     <div>
-      <div class="kpi-head"><span class="kpi-label">Đúng hạn</span><span class="kpi-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span></div>
+      <div class="kpi-head"><span class="kpi-label">Đúng hạn</span><span class="kpi-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="12" r="8"/><path d="M11 7v5l3 2"/><path d="m16.5 18.5 1.7 1.7 3-3.4"/></svg></span></div>
       <div class="kpi-val" id="kOntime">0</div>
       <div class="kpi-rate" id="rOntime">0%</div>
     </div>
@@ -235,7 +466,7 @@ table{border-collapse:collapse;width:100%;font-size:9px}th{background:#f8fafc;co
   </div>
   <div class="kpi k-amber" data-kind="doing">
     <div>
-      <div class="kpi-head"><span class="kpi-label">Đang thực hiện</span><span class="kpi-icon"><svg viewBox="0 0 24 24"><path d="M7 3h10M7 21h10M8 3c0 5 2 6 4 9-2 3-4 4-4 9M16 3c0 5-2 6-4 9 2 3 4 4 4 9"/></svg></span></div>
+      <div class="kpi-head"><span class="kpi-label">Đang thực hiện</span><span class="kpi-icon"><svg viewBox="0 0 24 24"><path d="M7 7h4V3M17 17h-4v4"/><path d="M18.5 8.5A7 7 0 0 0 7 6l-2 1M5.5 15.5A7 7 0 0 0 17 18l2-1"/><circle cx="12" cy="12" r="2"/></svg></span></div>
       <div class="kpi-val" id="kDoing">0</div>
       <div class="kpi-rate" id="rDoing">Chưa quá hạn</div>
     </div>
@@ -247,7 +478,7 @@ table{border-collapse:collapse;width:100%;font-size:9px}th{background:#f8fafc;co
   </div>
   <div class="kpi k-violet" data-kind="stale">
     <div>
-      <div class="kpi-head"><span class="kpi-label">Cập nhật muộn</span><span class="kpi-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2M7 4l-2 2M17 4l2 2"/></svg></span></div>
+      <div class="kpi-head"><span class="kpi-label">Cập nhật muộn</span><span class="kpi-icon"><svg viewBox="0 0 24 24"><path d="M4 5h12a3 3 0 0 1 3 3v5a3 3 0 0 1-3 3H9l-4 3v-3H4z"/><circle cx="17" cy="17" r="4"/><path d="M17 15v2l1.5 1"/></svg></span></div>
       <div class="kpi-val" id="kStale">0</div>
       <div class="kpi-rate" id="rStale">Theo comment trưởng nhóm</div>
     </div>
@@ -265,32 +496,45 @@ table{border-collapse:collapse;width:100%;font-size:9px}th{background:#f8fafc;co
     <div class="attention-list">
       <div class="alert-card a-red" data-kind="over7"><div class="alert-ico"><svg viewBox="0 0 24 24"><path d="M12 3 2.5 20h19L12 3Z"/><path d="M12 9v5M12 17h.01"/></svg></div><div><b id="aOver7">0</b><p>Công việc quá hạn &gt; 7 ngày</p><a href="#">Xem đúng danh sách Jira ↗</a></div></div>
       <div class="alert-card a-amber" data-kind="soon"><div class="alert-ico"><svg viewBox="0 0 24 24"><path d="M12 4 3 20h18z"/></svg></div><div><b id="aSoon">0</b><p>Công việc sắp đến hạn (≤ 3 ngày)</p><a href="#">Xem đúng danh sách Jira ↗</a></div></div>
-      <div class="alert-card a-amber" data-kind="veryComplex"><div class="alert-ico"><svg viewBox="0 0 24 24"><path d="M12 4 3 20h18z"/></svg></div><div><b id="aComplex">0</b><p>Công việc Very Complex có nguy cơ trễ</p><a href="#">Xem đúng danh sách Jira ↗</a></div></div>
-      <div class="alert-card a-blue" data-kind="stale"><div class="alert-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><div><b id="aStale">0</b><p>Cập nhật muộn do trưởng nhóm xác nhận</p><a href="#">Xem đúng danh sách Jira ↗</a></div></div>
+      <div class="alert-card a-violet" data-kind="veryComplex"><div class="alert-ico"><svg viewBox="0 0 24 24"><path d="M12 4 3 20h18z"/></svg></div><div><b id="aComplex">0</b><p>Công việc Very Complex có nguy cơ trễ</p><a href="#">Xem đúng danh sách Jira ↗</a></div></div>
+      <div class="alert-card a-blue" data-kind="stale"><div class="alert-ico"><svg viewBox="0 0 24 24"><circle cx="11" cy="12" r="8"/><path d="M11 7v5l3 2"/><path d="m16.5 18.5 1.7 1.7 3-3.4"/></svg></div><div><b id="aStale">0</b><p>Cập nhật muộn do trưởng nhóm xác nhận</p><a href="#">Xem đúng danh sách Jira ↗</a></div></div>
     </div>
   </div>
   <div class="card">
     <div class="card-title">Quy tắc theo dõi BSC đang áp dụng</div>
-    <div class="thresholds"><div class="threshold"><span>Kỳ BSC của Task</span><strong>Theo Due date</strong></div><div class="threshold"><span>Hết hạn trong ngày</span><strong>Sau 23:59:59</strong></div><div class="threshold"><span>Quá hạn</span><strong>DONE sau Due vẫn tính Quá hạn</strong></div><div class="threshold"><span>Cập nhật muộn</span><strong>Comment trưởng nhóm xác nhận</strong></div><div class="threshold"><span>Đối soát phân loại</span><strong id="classCheck">0 / 0</strong></div><div class="threshold"><span>Workload % / BSC</span><strong>Tạm tắt</strong></div></div>
+    <div class="thresholds"><div class="threshold"><span>Kỳ BSC của Task</span><strong>Theo Due date</strong></div><div class="threshold"><span>Hết hạn trong ngày</span><strong>Sau 23:59:59</strong></div><div class="threshold"><span>Quá hạn</span><strong>DONE sau Due vẫn tính Quá hạn</strong></div><div class="threshold"><span>Cập nhật muộn</span><strong>Comment trưởng nhóm xác nhận</strong></div><div class="threshold"><span>Đối soát phân loại</span><strong id="classCheck">0 / 0</strong></div></div>
   </div>
 </section>
 
 <section class="performance" id="staffSec">
-  <div class="card">
-    <div class="card-title">Hiệu suất cán bộ</div>
-    <div class="table-wrap"><table><thead><tr><th>#</th><th>Cán bộ</th><th>Tổng việc</th><th>Hoàn thành</th><th>Đúng hạn (%)</th><th>Quá hạn (%)</th><th>QH đã HT</th><th>QH chưa HT tại mốc</th><th>Sắp đến hạn</th><th>Cập nhật muộn</th><th>Workload (tham khảo)</th></tr></thead><tbody id="staffBody"></tbody></table></div>
-  </div>
-  <div class="card">
-    <div class="card-title">Phân bổ trạng thái công việc</div>
-    <div class="donut-wrap"><div class="donut" id="donut"><div class="donut-center"><div><strong id="donutTotal">0</strong><span>Tổng</span></div></div></div><div class="legend"><div class="leg" data-kind="ontime"><i class="dot" style="background:#18a86f"></i><span>Đúng hạn</span><strong id="lOn">0</strong></div><div class="leg" data-kind="stale"><i class="dot" style="background:#8b5cf6"></i><span>Cập nhật muộn</span><strong id="lStaleDonut">0</strong></div><div class="leg" data-kind="overdue"><i class="dot" style="background:#e45660"></i><span>Quá hạn</span><strong id="lOver">0</strong></div><div class="leg" data-kind="doing"><i class="dot" style="background:#2386d7"></i><span>Đang thực hiện</span><strong id="lDoing">0</strong></div></div></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px">
-      <div style="background:#f7fbfa;border:1px solid #e1efeb;border-radius:9px;padding:8px 10px;text-align:center"><div style="font-size:8px;color:#789285">Tỷ lệ hoàn thành</div><strong id="donutDoneRate" style="font-size:15px;color:#149a68">0%</strong></div>
-      <div style="background:#f9fbfe;border:1px solid #e4ecf4;border-radius:9px;padding:8px 10px;text-align:center"><div style="font-size:8px;color:#7d8fa0">Tỷ lệ đúng hạn</div><strong id="donutOnRate" style="font-size:15px;color:#1672cb">0%</strong></div>
+  <div class="card staff-performance-card">
+    <div class="section-heading">
+      <div>
+        <div class="card-title">Hiệu suất cán bộ</div>
+        <div class="card-sub">Đối soát trực tiếp theo từng cán bộ và từng nhóm trạng thái BSC</div>
+      </div>
+      <div class="section-badge">Theo Due date</div>
     </div>
+    <div class="table-wrap staff-table-wrap"><table><thead><tr><th>#</th><th>Cán bộ</th><th>Tổng việc</th><th>Hoàn thành</th><th>Đúng hạn (%)</th><th>Quá hạn (%)</th><th>QH đã HT</th><th>QH chưa HT tại mốc</th><th>Sắp đến hạn</th><th>Cập nhật muộn</th></tr></thead><tbody id="staffBody"></tbody></table></div>
   </div>
-  <div class="card">
-    <div class="card-title">Quá hạn theo cán bộ (Top 7)</div>
-    <div class="rank-list" id="rankList"></div>
+  <div class="insights-grid">
+    <div class="card insight-card">
+      <div class="section-heading">
+        <div><div class="card-title">Phân bổ trạng thái công việc</div><div class="card-sub">Cơ cấu toàn bộ công việc trong kỳ BSC</div></div>
+      </div>
+      <div class="donut-wrap"><div class="donut" id="donut"><div class="donut-center"><div><strong id="donutTotal">0</strong><span>Tổng</span></div></div></div><div class="legend"><div class="leg" data-kind="ontime"><i class="dot" style="background:#18a86f"></i><span>Đúng hạn</span><strong id="lOn">0</strong></div><div class="leg" data-kind="stale"><i class="dot" style="background:#8b5cf6"></i><span>Cập nhật muộn</span><strong id="lStaleDonut">0</strong></div><div class="leg" data-kind="overdue"><i class="dot" style="background:#e45660"></i><span>Quá hạn</span><strong id="lOver">0</strong></div><div class="leg" data-kind="doing"><i class="dot" style="background:#2386d7"></i><span>Đang thực hiện</span><strong id="lDoing">0</strong></div></div></div>
+      <div class="rate-pairs">
+        <div class="rate-card rate-green"><span>Tỷ lệ hoàn thành</span><strong id="donutDoneRate">0%</strong></div>
+        <div class="rate-card rate-blue"><span>Tỷ lệ đúng hạn</span><strong id="donutOnRate">0%</strong></div>
+      </div>
+    </div>
+    <div class="card insight-card">
+      <div class="section-heading">
+        <div><div class="card-title">Quá hạn theo cán bộ</div><div class="card-sub">Top 7 cán bộ cần ưu tiên theo dõi</div></div>
+        <div class="section-badge danger">Top 7</div>
+      </div>
+      <div class="rank-list" id="rankList"></div>
+    </div>
   </div>
 </section>
 
@@ -315,7 +559,7 @@ table{border-collapse:collapse;width:100%;font-size:9px}th{background:#f8fafc;co
     </div>
   </div>
 
-  <div class="footer-note"><span><strong>Quy tắc BSC:</strong> Task thuộc duy nhất kỳ của Due date. Due 21/08 chỉ bắt đầu quá hạn từ 00:00 ngày 22/08. Nếu DONE ngày 28/08 thì vẫn là <b>Quá hạn – đã hoàn thành</b>; nếu đến mốc cuối tháng vẫn chưa DONE thì là <b>Quá hạn – chưa hoàn thành tại mốc BSC</b>. Quý/Năm chỉ tổng hợp các kết quả tháng gốc, không chuyển Task sang tháng DONE.</span><span><strong>Cập nhật muộn:</strong> là ngoại lệ do trưởng nhóm xác nhận bằng comment marker; Task được tách khỏi Quá hạn và ghi riêng Cập nhật muộn. Workload % và điểm BSC đang tạm tắt.</span></div>
+  <div class="footer-note"><span><strong>Quy tắc BSC:</strong> Task thuộc duy nhất kỳ của Due date. Due 21/08 chỉ bắt đầu quá hạn từ 00:00 ngày 22/08. Nếu DONE ngày 28/08 thì vẫn là <b>Quá hạn – đã hoàn thành</b>; nếu đến mốc cuối tháng vẫn chưa DONE thì là <b>Quá hạn – chưa hoàn thành tại mốc BSC</b>. Quý/Năm chỉ tổng hợp các kết quả tháng gốc, không chuyển Task sang tháng DONE.</span><span><strong>Cập nhật muộn:</strong> là ngoại lệ do trưởng nhóm xác nhận bằng comment marker; Task được tách khỏi Quá hạn và ghi riêng Cập nhật muộn.</span></div>
 </section>
 </div>
 </main>
@@ -493,11 +737,10 @@ function renderStaff(m){
          over=a.filter(x=>x.overdue).length,
          soon=a.filter(x=>x.soon).length,
          stale=a.filter(x=>x.stale).length,
-         work=a.reduce((z,x)=>z+x.weight,0),
          completion=pct(done,total),
          onr=pct(on,total),
          overr=pct(over,total);
-   return {name,total,done,on,late,overOpen,onr,overr,over,soon,stale,work,completion};
+   return {name,total,done,on,late,overOpen,onr,overr,over,soon,stale,completion};
  }).sort((a,b)=>b.onr-a.onr || a.over-b.over || a.name.localeCompare(b.name,"vi"));
 
  const statButton=(value,staff,kind,extraClass="") =>
@@ -515,7 +758,6 @@ function renderStaff(m){
      <td>${statButton(x.overOpen,x.name,"overdueOpen")}</td>
      <td>${statButton(x.soon,x.name,"soon")}</td>
      <td>${statButton(x.stale,x.name,"stale")}</td>
-     <td><button class="stat-jira" data-staff="${esc(x.name)}" data-kind="all" title="Workload hiện chỉ hiển thị tham khảo, chưa dùng để tính BSC">${x.work}</button></td>
    </tr>
  `).join("");
 
