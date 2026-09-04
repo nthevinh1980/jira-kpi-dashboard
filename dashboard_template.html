@@ -366,6 +366,31 @@ body{
 }
 @media(max-width:1120px){.core-badge{display:none}}
 
+
+/* ===== V10.4 BSC PERIOD REPORT + CURRENT ALERTS ===== */
+.bsc-period-card{
+  margin-top:12px;padding:13px 14px 14px;
+  border-top:3px solid transparent;
+  border-image:linear-gradient(90deg,var(--core-teal),var(--core-cyan),var(--core-violet)) 1;
+}
+.bsc-period-card .kpis{margin-top:11px}
+.bsc-period-heading{padding:0 2px 2px}
+#bscReportTitle{font-size:12px;color:#143b54}
+#bscReportSub{font-size:9px}
+#alertSec .card:first-child{
+  border-top:3px solid transparent;
+  border-image:linear-gradient(90deg,var(--core-red),var(--core-gold),var(--core-cyan)) 1;
+}
+#alertAsOf{color:#a6454f;background:#fff1f2;border-color:#f5d9dc}
+.attention-grid{align-items:stretch}
+.detail-table{min-width:1120px}
+@media(max-width:1400px){
+  .bsc-period-card .kpis{grid-template-columns:repeat(3,1fr)}
+}
+@media(max-width:700px){
+  .bsc-period-card .kpis{grid-template-columns:repeat(2,1fr)}
+}
+
 </style>
 </head>
 <body>
@@ -415,7 +440,15 @@ body{
   <strong>Core Banking Control:</strong> Mọi số lượng/KPI có thể bấm để mở đúng tập Issue Key trên Jira, phục vụ đối soát Dashboard ↔ Jira theo từng kỳ BSC.
 </div>
 
-<section class="kpis" id="kpiSec">
+<section class="card bsc-period-card" id="bscReportSec">
+  <div class="section-heading bsc-period-heading">
+    <div>
+      <div class="card-title" id="bscReportTitle">Báo cáo BSC theo kỳ</div>
+      <div class="card-sub" id="bscReportSub">Phân loại công việc theo Due date của kỳ đang chọn</div>
+    </div>
+    <div class="section-badge" id="bscReportBadge">Theo Due date</div>
+  </div>
+  <div class="kpis" id="kpiSec">
   <div class="kpi k-blue" data-kind="all">
     <div>
       <div class="kpi-head"><span class="kpi-label">Tổng công việc</span><span class="kpi-icon"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v5c0 1.7 3.1 3 7 3s7-1.3 7-3V5M5 10v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/><path d="M8 20h8M12 18v2"/></svg></span></div>
@@ -480,7 +513,7 @@ body{
     <div>
       <div class="kpi-head"><span class="kpi-label">Cập nhật muộn</span><span class="kpi-icon"><svg viewBox="0 0 24 24"><path d="M4 5h12a3 3 0 0 1 3 3v5a3 3 0 0 1-3 3H9l-4 3v-3H4z"/><circle cx="17" cy="17" r="4"/><path d="M17 15v2l1.5 1"/></svg></span></div>
       <div class="kpi-val" id="kStale">0</div>
-      <div class="kpi-rate" id="rStale">Theo comment trưởng nhóm</div>
+      <div class="kpi-rate" id="rStale">Theo Jira Label "Muon"</div>
     </div>
     <div class="kpi-bottom">
       <div class="kpi-delta"><strong id="dStale">—</strong> so với kỳ trước</div>
@@ -488,21 +521,28 @@ body{
       <div class="kpi-link">Xem trên Jira</div>
     </div>
   </div>
+</div>
 </section>
 
 <section class="attention-grid" id="alertSec">
   <div class="card">
-    <div class="card-title">Cảnh báo theo kỳ BSC</div>
+    <div class="section-heading">
+      <div>
+        <div class="card-title">Cảnh báo tới thời điểm hiện tại</div>
+        <div class="card-sub">Không lọc theo kỳ BSC · vẫn áp dụng bộ lọc Cán bộ / Epic / Loại công việc</div>
+      </div>
+      <div class="section-badge danger" id="alertAsOf">Hiện tại</div>
+    </div>
     <div class="attention-list">
-      <div class="alert-card a-red" data-kind="over7"><div class="alert-ico"><svg viewBox="0 0 24 24"><path d="M12 3 2.5 20h19L12 3Z"/><path d="M12 9v5M12 17h.01"/></svg></div><div><b id="aOver7">0</b><p>Công việc quá hạn &gt; 7 ngày</p><a href="#">Xem đúng danh sách Jira ↗</a></div></div>
+      <div class="alert-card a-red" data-kind="currentOverdue"><div class="alert-ico"><svg viewBox="0 0 24 24"><path d="M12 3 2.5 20h19L12 3Z"/><path d="M12 9v5M12 17h.01"/></svg></div><div><b id="aCurrentOverdue">0</b><p>Quá hạn chưa hoàn thành từ tất cả các kỳ</p><a href="#">Xem đúng danh sách Jira ↗</a></div></div>
       <div class="alert-card a-amber" data-kind="soon"><div class="alert-ico"><svg viewBox="0 0 24 24"><path d="M12 4 3 20h18z"/></svg></div><div><b id="aSoon">0</b><p>Công việc sắp đến hạn (≤ 3 ngày)</p><a href="#">Xem đúng danh sách Jira ↗</a></div></div>
       <div class="alert-card a-violet" data-kind="veryComplex"><div class="alert-ico"><svg viewBox="0 0 24 24"><path d="M12 4 3 20h18z"/></svg></div><div><b id="aComplex">0</b><p>Công việc Very Complex có nguy cơ trễ</p><a href="#">Xem đúng danh sách Jira ↗</a></div></div>
-      <div class="alert-card a-blue" data-kind="stale"><div class="alert-ico"><svg viewBox="0 0 24 24"><circle cx="11" cy="12" r="8"/><path d="M11 7v5l3 2"/><path d="m16.5 18.5 1.7 1.7 3-3.4"/></svg></div><div><b id="aStale">0</b><p>Cập nhật muộn do trưởng nhóm xác nhận</p><a href="#">Xem đúng danh sách Jira ↗</a></div></div>
+      <div class="alert-card a-blue" data-kind="stale"><div class="alert-ico"><svg viewBox="0 0 24 24"><circle cx="11" cy="12" r="8"/><path d="M11 7v5l3 2"/><path d="m16.5 18.5 1.7 1.7 3-3.4"/></svg></div><div><b id="aStale">0</b><p>Cập nhật muộn theo Jira Label <strong>Muon</strong></p><a href="#">Xem đúng danh sách Jira ↗</a></div></div>
     </div>
   </div>
   <div class="card">
     <div class="card-title">Quy tắc theo dõi BSC đang áp dụng</div>
-    <div class="thresholds"><div class="threshold"><span>Kỳ BSC của Task</span><strong>Theo Due date</strong></div><div class="threshold"><span>Hết hạn trong ngày</span><strong>Sau 23:59:59</strong></div><div class="threshold"><span>Quá hạn</span><strong>DONE sau Due vẫn tính Quá hạn</strong></div><div class="threshold"><span>Cập nhật muộn</span><strong>Comment trưởng nhóm xác nhận</strong></div><div class="threshold"><span>Đối soát phân loại</span><strong id="classCheck">0 / 0</strong></div></div>
+    <div class="thresholds"><div class="threshold"><span>Kỳ BSC của Task</span><strong>Theo Due date</strong></div><div class="threshold"><span>Hết hạn trong ngày</span><strong>Sau 23:59:59</strong></div><div class="threshold"><span>Quá hạn</span><strong>DONE sau Due vẫn tính Quá hạn</strong></div><div class="threshold"><span>Cập nhật muộn</span><strong>Jira Label = Muon</strong></div><div class="threshold"><span>Cảnh báo hiện tại</span><strong>Không lọc theo kỳ</strong></div><div class="threshold"><span>Đối soát BSC theo kỳ</span><strong id="classCheck">0 / 0</strong></div></div>
   </div>
 </section>
 
@@ -515,7 +555,7 @@ body{
       </div>
       <div class="section-badge">Theo Due date</div>
     </div>
-    <div class="table-wrap staff-table-wrap"><table><thead><tr><th>#</th><th>Cán bộ</th><th>Tổng việc</th><th>Hoàn thành</th><th>Đúng hạn (%)</th><th>Quá hạn (%)</th><th>QH đã HT</th><th>QH chưa HT</th><th>Sắp đến hạn</th><th>Cập nhật muộn</th></tr></thead><tbody id="staffBody"></tbody></table></div>
+    <div class="table-wrap staff-table-wrap"><table><thead><tr><th>#</th><th>Cán bộ</th><th>Tổng việc</th><th>Hoàn thành</th><th>Đúng hạn (%)</th><th>Quá hạn (%)</th><th>QH đã HT</th><th>QH chưa HT tại mốc</th><th>Sắp đến hạn</th><th>Cập nhật muộn</th></tr></thead><tbody id="staffBody"></tbody></table></div>
   </div>
   <div class="insights-grid">
     <div class="card insight-card">
@@ -539,8 +579,8 @@ body{
 </section>
 
 <section class="card detail" id="detailSec">
-  <div class="detail-head"><div><div class="card-title">Chi tiết công việc Jira (Drill-down)</div><div class="card-sub" id="detailSub">Tất cả công việc</div></div><div class="detail-actions"><button class="chip active" data-filter="all">Tất cả</button><button class="chip" data-filter="ontime">Đúng hạn</button><button class="chip" data-filter="overdue">Quá hạn</button><button class="chip" data-filter="late">QH đã HT</button><button class="chip" data-filter="overdueOpen">QH chưa HT</button><button class="chip" data-filter="soon">Sắp đến hạn</button><button class="chip" data-filter="stale">Cập nhật muộn</button></div></div>
-  <div class="table-wrap"><table class="detail-table"><thead><tr><th>Key</th><th>Summary</th><th>Cán bộ</th><th>Complexity</th><th>Component</th><th>Epic</th><th>Loại việc</th><th>Due date</th><th>Resolution date</th><th>Trạng thái</th><th>Số ngày trễ</th><th>Cập nhật gần nhất</th><th>Nguồn</th><th>Căn cứ kỳ</th><th>Mức cảnh báo</th></tr></thead><tbody id="taskBody"></tbody></table></div>
+  <div class="detail-head"><div><div class="card-title">Chi tiết công việc Jira (Drill-down)</div><div class="card-sub" id="detailSub">Tất cả công việc</div></div><div class="detail-actions"><button class="chip active" data-filter="all">Tất cả</button><button class="chip" data-filter="ontime">Đúng hạn</button><button class="chip" data-filter="overdue">Quá hạn</button><button class="chip" data-filter="late">QH đã HT</button><button class="chip" data-filter="overdueOpen">QH chưa HT tại mốc</button><button class="chip" data-filter="soon">Sắp đến hạn</button><button class="chip" data-filter="stale">Cập nhật muộn</button></div></div>
+  <div class="table-wrap"><table class="detail-table"><thead><tr><th>Key</th><th>Summary</th><th>Cán bộ</th><th>Complexity</th><th>Epic</th><th>Loại việc</th><th>Due date</th><th>Resolution date</th><th>Trạng thái</th><th>Số ngày trễ</th><th>Cập nhật gần nhất</th><th>Căn cứ kỳ</th><th>Mức cảnh báo</th></tr></thead><tbody id="taskBody"></tbody></table></div>
   
   <div class="pagination-wrap" id="paginationWrap">
     <div class="page-info" id="pageInfo">Đang hiển thị 0–0 / 0 công việc</div>
@@ -559,7 +599,7 @@ body{
     </div>
   </div>
 
-  <div class="footer-note"><span><strong>Quy tắc BSC:</strong> Task thuộc duy nhất kỳ của Due date. Due 21/08 chỉ bắt đầu quá hạn từ 00:00 ngày 22/08. Nếu DONE ngày 28/08 thì vẫn là <b>Quá hạn – đã hoàn thành</b>; nếu đến mốc cuối tháng vẫn chưa DONE thì là <b>Quá hạn – chưa hoàn thành tại mốc BSC</b>. Quý/Năm chỉ tổng hợp các kết quả tháng gốc, không chuyển Task sang tháng DONE.</span><span><strong>Cập nhật muộn:</strong> là ngoại lệ do trưởng nhóm xác nhận bằng comment marker; Task được tách khỏi Quá hạn và ghi riêng Cập nhật muộn.</span></div>
+  <div class="footer-note"><span><strong>Quy tắc BSC:</strong> Task thuộc duy nhất kỳ của Due date. Due 21/08 chỉ bắt đầu quá hạn từ 00:00 ngày 22/08. Nếu DONE ngày 28/08 thì vẫn là <b>Quá hạn – đã hoàn thành</b>; nếu đến mốc cuối tháng vẫn chưa DONE thì là <b>Quá hạn – chưa hoàn thành tại mốc BSC</b>. Quý/Năm chỉ tổng hợp các kết quả tháng gốc, không chuyển Task sang tháng DONE.</span><span><strong>Cập nhật muộn:</strong> Task có Jira Label <b>Muon</b> được tách khỏi nhóm Quá hạn/QH đã HT và ghi riêng là Cập nhật muộn.</span></div>
 </section>
 </div>
 </main>
@@ -627,6 +667,54 @@ function monthCutoffExclusive(dueStart){
  if(!dueStart)return null;
  return new Date(dueStart.getFullYear(),dueStart.getMonth()+1,1,0,0,0,0);
 }
+
+function hasMuonLabel(x){
+ const labels=Array.isArray(x.labels)?x.labels:[];
+ return labels.some(v=>String(v||"").trim().toLowerCase()==="muon");
+}
+function periodDisplayName(){
+ const c=$("#cycle").value,p=$("#period").value;
+ if(c==="Tháng"){
+   const [y,m]=p.split("-");
+   return `THÁNG ${m}/${y}`;
+ }
+ if(c==="Quý"){
+   const [y,q]=p.split("-Q");
+   return `QUÝ ${q}/${y}`;
+ }
+ return `NĂM ${p}`;
+}
+// Trạng thái phục vụ CẢNH BÁO HIỆN TẠI:
+// không dùng mốc đóng sổ của tháng và không lọc theo kỳ BSC.
+function currentState(x){
+ const now=new Date(),dueStart=d(x.due),dueDeadline=nextDayStart(dueStart),res=dt(x.resolutionAt||x.resolution);
+ const statusDone=(String(x.statusCategory||"").toLowerCase()==="done")||["done","closed","resolved"].includes(String(x.status||"").toLowerCase());
+ const stale=hasMuonLabel(x);
+ // Label Muon biểu thị trường hợp công việc đã được ghi nhận hoàn thành nhưng Jira cập nhật muộn.
+ const currentDone=stale||!!res||statusDone;
+ const currentOverdue=!currentDone&&!!dueDeadline&&dueDeadline<=now;
+ const todayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+ const daysToDue=dueStart?Math.floor((dueStart-todayStart)/86400000):9999;
+ const currentSoon=!currentDone&&!!dueStart&&daysToDue>=0&&daysToDue<=3;
+ let currentDaysLate=0;
+ if(currentOverdue&&dueStart){
+   const nowDay=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+   currentDaysLate=Math.max(1,Math.round((nowDay-dueStart)/86400000));
+ }
+ const currentVeryComplex=String(x.complexity||"")==="Very Complex"&&(currentOverdue||currentSoon);
+ return {...x,currentDone,currentOverdue,currentSoon,currentDaysLate,currentVeryComplex,currentStale:stale};
+}
+function alertCalc(){
+ const rows=DATA.filter(filtersOk).map(currentState); // CỐ Ý không DATA.filter(inPeriod)
+ return {
+   rows,
+   overdue:rows.filter(x=>x.currentOverdue),
+   soon:rows.filter(x=>x.currentSoon),
+   veryComplex:rows.filter(x=>x.currentVeryComplex),
+   stale:rows.filter(x=>x.currentStale)
+ };
+}
+
 function state(x){
  const dueStart=d(x.due),dueDeadline=nextDayStart(dueStart),res=dt(x.resolutionAt||x.resolution),now=new Date(),monthCutoff=monthCutoffExclusive(dueStart);
  const historical=!!monthCutoff&&now>=monthCutoff;
@@ -642,7 +730,7 @@ function state(x){
 
  // Cập nhật muộn là NGOẠI LỆ có xác nhận trưởng nhóm bằng comment marker.
  // Khi có marker và Task đã/đang ở trạng thái Done, tách Task khỏi nhóm Quá hạn.
- const stale=Boolean(x.lateUpdate)&&(!!res||statusDone);
+ const stale=hasMuonLabel(x);
  const done=stale||doneRecorded;
 
  // Đúng hạn: Resolution trước 00:00 ngày sau Due.
@@ -705,7 +793,11 @@ function pct(n,d){return d?100*n/d:0}
 function delta(cur,prev,suf="%"){if(!prev)return "—";const v=100*(cur-prev)/prev;return `${v>=0?"↗":"↘"} ${Math.abs(v).toFixed(0)}${suf}`}
 function scoreClass(v){return v>=90?"p-good":v>=80?"p-mid":"p-bad"}
 function render(){
- const m=calc(),p=calc(prevPid());
+ const m=calc(),p=calc(prevPid()),alerts=alertCalc();
+ $("#bscReportTitle").textContent=`Báo cáo BSC ${periodDisplayName()}`;
+ $("#bscReportSub").textContent=`Theo Due date · ${m.total} công việc thuộc kỳ đang chọn`;
+ $("#bscReportBadge").textContent=periodDisplayName();
+ $("#alertAsOf").textContent=new Date().toLocaleString("vi-VN",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
  $("#kTotal").textContent=m.total;
  $("#kDone").textContent=m.done;$("#rDone").textContent=m.completion.toFixed(1)+"%";
  $("#kOntime").textContent=m.on;$("#rOntime").textContent=m.ontime.toFixed(1)+"%";
@@ -719,7 +811,7 @@ function render(){
  $("#mDoing").style.width=Math.min(100,pct(m.doing,m.total)).toFixed(1)+"%";
  $("#mStale").style.width=Math.min(100,pct(m.stale,m.total)).toFixed(1)+"%";
  $("#dTotal").textContent=delta(m.total,p.total);$("#dDone").textContent=delta(m.done,p.done);$("#dOntime").textContent=delta(m.on,p.on);$("#dOver").textContent=delta(m.over,p.over);$("#dDoing").textContent=delta(m.doing,p.doing);$("#dStale").textContent=delta(m.stale,p.stale);
- $("#aOver7").textContent=m.rows.filter(x=>x.overdue&&x.daysLate>7).length;$("#aSoon").textContent=m.soon;$("#aComplex").textContent=m.rows.filter(x=>x.complexity==="Very Complex"&&(x.overdue||x.soon)).length;$("#aStale").textContent=m.stale;
+ $("#aCurrentOverdue").textContent=alerts.overdue.length;$("#aSoon").textContent=alerts.soon.length;$("#aComplex").textContent=alerts.veryComplex.length;$("#aStale").textContent=alerts.stale.length;
  const chk=$("#classCheck");if(chk){chk.textContent=`${m.classified} / ${m.total}`;chk.style.color=m.classified===m.total?"#11875d":"#d14343";}
  renderStaff(m);renderDonut(m);renderRank(m);renderTasks(m);renderRange()
 }
@@ -820,15 +912,13 @@ function renderTasks(m){
      <td>${esc(x.summary)}</td>
      <td>${esc(x.assignee)}</td>
      <td><span class="tag ${x.complexity==="Very Complex"?"tag-red":x.complexity==="Complex"?"tag-yellow":"tag-green"}">${esc(x.complexity)}</span></td>
-     <td>${esc(x.component)}</td>
      <td>${esc(x.epic)}</td>
      <td>${esc(x.type)}</td>
      <td>${fmt(x.due)}</td>
      <td>${fmt(x.resolution)}</td>
      <td><span class="tag ${stat[1]}">${stat[0]}</span></td>
      <td class="${x.daysLate>0?"bad":""}">${x.daysLate>0?"+"+x.daysLate:"-"}</td>
-     <td>${x.stale?`<span class="tag tag-yellow">Cập nhật muộn</span><br/>`:""}${fmt(x.comment||x.updated)}${x.lateUpdateAuthor?`<br/><span style="font-size:8px;color:#71889a">${esc(x.lateUpdateAuthor)}</span>`:""}</td>
-     <td>${x.source==="CAUNN"?"Cầu":"Fusion&QA"}</td>
+     <td>${x.stale?`<span class="tag tag-yellow">Label: Muon</span><br/>`:""}${fmt(x.comment||x.updated)}${x.lateUpdateAuthor?`<br/><span style="font-size:8px;color:#71889a">${esc(x.lateUpdateAuthor)}</span>`:""}</td>
      <td>${esc(x.periodBasis||"")}</td>
      <td><span class="tag ${ic}">${imp}</span></td>
    </tr>`;
@@ -883,12 +973,11 @@ $$(".kpi").forEach(k=>k.onclick=()=>{
 })
 $$(".alert-card").forEach(a=>a.onclick=e=>{
  e.preventDefault();
- const m=calc(),k=a.dataset.kind;
- if(k==="over7"){openRowsInJira(rowsForKind(m,"over7"));return}
- if(k==="soon"){openRowsInJira(rowsForKind(m,"soon"));return}
- if(k==="veryComplex"){openRowsInJira(rowsForKind(m,"veryComplex"));return}
- if(k==="stale"){openRowsInJira(rowsForKind(m,"stale"));return}
-
+ const alerts=alertCalc(),k=a.dataset.kind;
+ if(k==="currentOverdue"){openRowsInJira(alerts.overdue);return}
+ if(k==="soon"){openRowsInJira(alerts.soon);return}
+ if(k==="veryComplex"){openRowsInJira(alerts.veryComplex);return}
+ if(k==="stale"){openRowsInJira(alerts.stale);return}
 }) 
 $$(".chip").forEach(c=>c.onclick=()=>{detailFilter=c.dataset.filter;detailPage=1;$$(".chip").forEach(x=>x.classList.toggle("active",x===c));render()})
 
