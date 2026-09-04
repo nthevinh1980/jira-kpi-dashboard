@@ -536,7 +536,7 @@ body{
     <div class="section-heading">
       <div>
         <div class="card-title">Cảnh báo tới thời điểm hiện tại</div>
-        <div class="card-sub">Không lọc theo kỳ BSC · Quá hạn hiện tại = đã qua hết ngày Due và trạng thái Jira hiện tại chưa thuộc Done · vẫn áp dụng bộ lọc Cán bộ / Epic / Loại công việc</div>
+        <div class="card-sub">Nguồn Jira độc lập · không lọc theo kỳ BSC · lấy toàn bộ Task hiện đang chưa Done rồi kiểm tra Due date · vẫn áp dụng bộ lọc Cán bộ / Epic / Loại công việc</div>
       </div>
       <div class="section-badge danger" id="alertAsOf">Hiện tại</div>
     </div>
@@ -617,6 +617,7 @@ body{
 <script>
 const JIRA_BASE_URL = __JIRA_BASE_URL__;
 const DATA = __JIRA_DATA__;
+const ALERT_DATA = __JIRA_ALERT_DATA__;
 const WEIGHT={"Very Simple":1,"Simple":2,"Medium":3,"Complex":4,"Very Complex":5};
 const $=q=>document.querySelector(q), $$=q=>[...document.querySelectorAll(q)];
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
@@ -730,7 +731,8 @@ function currentState(x){
 function alertCalc(){
  // CỐ Ý KHÔNG dùng inPeriod(): cảnh báo là snapshot hiện tại của toàn bộ dữ liệu nguồn.
  // Nếu bộ lọc Cán bộ = Tất cả thì đây là backlog hiện tại của toàn team qua mọi tháng/quý/năm.
- const rows=DATA.filter(filtersOk).map(currentState);
+ const source=(Array.isArray(ALERT_DATA)&&ALERT_DATA.length)?ALERT_DATA:DATA;
+ const rows=source.filter(filtersOk).map(currentState);
  const open=rows.filter(x=>!x.currentDone);
  const withDue=open.filter(x=>!!d(x.due));
  const overdue=withDue.filter(x=>x.currentOverdue);
@@ -842,7 +844,7 @@ function render(){
  $("#mStale").style.width=Math.min(100,pct(m.stale,m.total)).toFixed(1)+"%";
  $("#dTotal").textContent=delta(m.total,p.total);$("#dDone").textContent=delta(m.done,p.done);$("#dOntime").textContent=delta(m.on,p.on);$("#dOver").textContent=delta(m.over,p.over);$("#dDoing").textContent=delta(m.doing,p.doing);$("#dStale").textContent=delta(m.stale,p.stale);
  $("#aCurrentOverdue").textContent=alerts.overdue.length;$("#aSoon").textContent=alerts.soon.length;$("#aComplex").textContent=alerts.veryComplex.length;$("#aStale").textContent=alerts.stale.length;
- $("#currentAlertAudit").textContent=`Phạm vi hiện tại: ${alerts.rows.length} Task nguồn · ${alerts.open.length} chưa hoàn thành · ${alerts.withDue.length} chưa hoàn thành có Due date · ${alerts.overdue.length} đã quá hạn`;
+ $("#currentAlertAudit").textContent=`Nguồn cảnh báo trực tiếp từ Jira: ${alerts.rows.length} Task đang chưa Done · ${alerts.withDue.length} có Due date · ${alerts.overdue.length} đã quá hạn`;
  const chk=$("#classCheck");if(chk){chk.textContent=`${m.classified} / ${m.total}`;chk.style.color=m.classified===m.total?"#11875d":"#d14343";}
  renderStaff(m);renderDonut(m);renderRank(m);renderTasks(m);renderRange()
 }
@@ -1048,7 +1050,11 @@ $("#exportBtn").onclick=()=>toast("Bản thật sẽ xuất CSV/XLSX/PDF theo b�
 $("#cycle").onchange=()=>{detailPage=1;fillPeriods();render()}
 ["#period","#assignee","#epic","#issueType"].forEach(id=>$(id).onchange=()=>{detailPage=1;render()})
 
-addOptions("#assignee",DATA.map(x=>x.assignee));addOptions("#epic",DATA.map(x=>x.epic));addOptions("#issueType",DATA.map(x=>x.type));fillPeriods();render();
+const FILTER_SOURCE=[...DATA,...((Array.isArray(ALERT_DATA)?ALERT_DATA:[]))];
+addOptions("#assignee",FILTER_SOURCE.map(x=>x.assignee));
+addOptions("#epic",FILTER_SOURCE.map(x=>x.epic));
+addOptions("#issueType",FILTER_SOURCE.map(x=>x.type));
+fillPeriods();render();
 </script>
 </body>
 </html>
