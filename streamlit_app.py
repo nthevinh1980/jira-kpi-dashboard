@@ -12,7 +12,7 @@ import streamlit.components.v1 as components
 from jira_client import JiraApiError, JiraClient
 
 
-APP_VERSION = "10.4-current-alerts-muon-label"
+APP_VERSION = "10.5-current-open-overdue"
 DEFAULT_JQL = 'project = "BANCORE" AND parentEpic IN (BANCORE-7559) AND issuetype = Task ORDER BY duedate ASC'
 
 st.set_page_config(
