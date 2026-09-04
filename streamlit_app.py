@@ -1,4 +1,4 @@
-from __future__ import annotations
+
 
 import json
 import os
@@ -12,8 +12,16 @@ import streamlit.components.v1 as components
 from jira_client import JiraApiError, JiraClient
 
 
-APP_VERSION = "10.5-current-open-overdue"
+APP_VERSION = "10.6-direct-current-alert-query"
 DEFAULT_JQL = 'project = "BANCORE" AND parentEpic IN (BANCORE-7559) AND issuetype = Task ORDER BY duedate ASC'
+DEFAULT_CURRENT_ALERT_JQL = (
+    'project = "BANCORE" '
+    'AND parentEpic IN (BANCORE-7559) '
+    'AND issuetype = Task '
+    'AND statusCategory != Done '
+    'ORDER BY duedate ASC'
+)
+
 
 st.set_page_config(
     page_title="Jira BSC Executive Dashboard",
@@ -182,6 +190,8 @@ def load_dashboard_data(
     division_value: str,
     caunn_jql: str,
     caunn_default_weight: int,
+    current_alert_jql: str,
+    caunn_current_alert_jql: str,
 ):
     client = JiraClient(base_url, email, token)
     me = client.test_connection()
@@ -245,6 +255,34 @@ def load_dashboard_data(
 
     combined = list(keyed.values())
 
+    # V10.6 — CẢNH BÁO HIỆN TẠI dùng một truy vấn Jira RIÊNG.
+    # Lý do: nếu chỉ lấy DATA đã tải cho BSC rồi lọc bằng JavaScript,
+    # các Task không có trong tập BSC nguồn sẽ không thể xuất hiện trong cảnh báo.
+    alert_main_issues = client.search_issues(
+        current_alert_jql.strip(),
+        fields,
+        page_size=100,
+        max_issues=10000,
+    ) if current_alert_jql.strip() else []
+
+    alert_caunn_issues = client.search_issues(
+        caunn_current_alert_jql.strip(),
+        fields,
+        page_size=100,
+        max_issues=10000,
+    ) if caunn_current_alert_jql.strip() else []
+
+    alert_keyed: dict[str, tuple[dict[str, Any], str]] = {}
+    for issue in alert_main_issues:
+        key = str(issue.get("key") or "")
+        if key:
+            alert_keyed[key] = (issue, "FUSION_QA")
+    for issue in alert_caunn_issues:
+        key = str(issue.get("key") or "")
+        if key:
+            alert_keyed[key] = (issue, "CAUNN")
+    alert_combined = list(alert_keyed.values())
+
     comment_map: dict[str, Any] = {}
     if sync_comments and combined:
         keys = [str(issue.get("key") or "") for issue, _ in combined if issue.get("key")]
@@ -269,6 +307,20 @@ def load_dashboard_data(
         for issue, source in combined
     ]
 
+    # Alert rows không cần đọc comment vì rule cập nhật muộn dùng Jira Label = Muon.
+    alert_rows = [
+        build_row(
+            issue,
+            complexity_id=complexity_id,
+            epic_id=epic_id,
+            division_id=division_id,
+            comment_map={},
+            source=source,
+            extra_default_weight=caunn_default_weight,
+        )
+        for issue, source in alert_combined
+    ]
+
     return {
         "rows": rows,
         "display_name": me.display_name,
@@ -282,6 +334,10 @@ def load_dashboard_data(
         "strict_division_filter": strict_division_filter,
         "caunn_count": len(caunn_issues),
         "combined_count": len(rows),
+        "alert_rows": alert_rows,
+        "alert_main_count": len(alert_main_issues),
+        "alert_caunn_count": len(alert_caunn_issues),
+        "alert_combined_count": len(alert_rows),
     }
 
 
@@ -305,6 +361,19 @@ caunn_jql = secret(
 )
 caunn_default_weight = int(secret("JIRA_CAUNN_DEFAULT_WEIGHT", "1") or "1")
 
+# V10.6: nguồn độc lập cho cảnh báo hiện tại.
+# Query này cố ý không có điều kiện tháng/quý/năm và chỉ lấy Task đang chưa Done.
+current_alert_jql = secret("JIRA_CURRENT_ALERT_JQL", DEFAULT_CURRENT_ALERT_JQL)
+
+caunn_current_alert_jql = secret(
+    "JIRA_CAUNN_CURRENT_ALERT_JQL",
+    'project = "2024.PS006_Xây dựng ứng dụng tác nghiệp tập trung tại quầy" '
+    'AND assignee = 712020:c282b441-9290-4c08-bc66-d834b94e17a7 '
+    'AND issuetype = Sub-task '
+    'AND statusCategory != Done '
+    'ORDER BY duedate ASC'
+)
+
 
 # JQL nguồn BSC không nên lọc theo trạng thái/ngày hiện tại. Nếu lọc status/resolved/duedate theo thời gian,
 # Task quá hạn của tháng cũ có thể biến mất sau khi Jira được Done ở tháng sau.
@@ -325,7 +394,7 @@ if not base_url or not email or not token:
 
 try:
     with st.spinner("Đang đồng bộ dữ liệu Jira..."):
-        payload = load_dashboard_data(base_url, email, token, jql, sync_comments, late_update_marker, division_value, caunn_jql, caunn_default_weight)
+        payload = load_dashboard_data(base_url, email, token, jql, sync_comments, late_update_marker, division_value, caunn_jql, caunn_default_weight, current_alert_jql, caunn_current_alert_jql)
 except JiraApiError as exc:
     st.error(f"Lỗi Jira API: {exc}")
     st.stop()
@@ -344,9 +413,11 @@ if not template_path.exists():
 
 page = template_path.read_text(encoding="utf-8")
 data_json = json.dumps(payload["rows"], ensure_ascii=False).replace("</script>", "<\\/script>")
+alert_json = json.dumps(payload.get("alert_rows") or [], ensure_ascii=False).replace("</script>", "<\\/script>")
 base_json = json.dumps(base_url.rstrip("/"), ensure_ascii=False)
 
 page = page.replace("__JIRA_DATA__", data_json)
+page = page.replace("__JIRA_ALERT_DATA__", alert_json)
 page = page.replace("__JIRA_BASE_URL__", base_json)
 page = page.replace("__SYNC_TIME__", payload["loaded_at"])
 
