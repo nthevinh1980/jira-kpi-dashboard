@@ -12,7 +12,7 @@ import streamlit.components.v1 as components
 from jira_client import JiraApiError, JiraClient
 
 
-APP_VERSION = "10.1-monthly-bsc-locked"
+APP_VERSION = "10.4-current-alerts-muon-label"
 DEFAULT_JQL = 'project = "BANCORE" AND parentEpic IN (BANCORE-7559) AND issuetype = Task ORDER BY duedate ASC'
 
 st.set_page_config(
@@ -112,17 +112,17 @@ def build_row(
     comment_audit = comment_map.get(str(issue.get("key") or ""))
     comment_date = ""
     comment_author = ""
-    late_update = False
-    late_update_date = ""
-    late_update_author = ""
     if isinstance(comment_audit, dict) and not comment_audit.get("error"):
         latest = comment_audit.get("latest") or {}
-        late_marker = comment_audit.get("lateUpdateComment") or {}
         comment_date = iso_date(latest.get("created"))
         comment_author = str(latest.get("author") or "")
-        late_update = bool(comment_audit.get("lateUpdate"))
-        late_update_date = iso_date(late_marker.get("created"))
-        late_update_author = str(late_marker.get("author") or "")
+
+    # V10.4: nguồn chính thức của "Cập nhật muộn" là Jira Label = Muon.
+    # Không còn phụ thuộc comment marker để phân loại BSC.
+    labels = [str(x).strip() for x in (f.get("labels") or []) if str(x).strip()]
+    late_update = any(label.casefold() == "muon" for label in labels)
+    late_update_date = ""
+    late_update_author = ""
 
     due = iso_date(f.get("duedate"))
     resolution_raw = str(f.get("resolutiondate") or "")
@@ -166,7 +166,8 @@ def build_row(
         "lateUpdate": late_update,
         "lateUpdateDate": late_update_date,
         "lateUpdateAuthor": late_update_author,
-        "labels": [str(x) for x in (f.get("labels") or [])],
+        "labels": labels,
+        "lateUpdateSource": "Jira Label: Muon" if late_update else "",
     }
 
 
@@ -289,7 +290,7 @@ email = secret("JIRA_EMAIL")
 token = secret("JIRA_API_TOKEN")
 jql = secret("JIRA_DEFAULT_JQL", DEFAULT_JQL)
 sync_comments = secret("JIRA_SYNC_COMMENTS", "true").strip().lower() in {"1", "true", "yes", "y"}
-late_update_marker = secret("JIRA_LATE_UPDATE_MARKER", "cập nhật muộn")
+late_update_marker = secret("JIRA_LATE_UPDATE_MARKER", "cập nhật muộn")  # chỉ giữ tương thích; BSC V10.4 dùng Label Muon
 
 # Lọc nhóm theo custom field của Task, không lọc theo tên cán bộ nữa.
 division_value = secret("JIRA_DIVISION_VALUE", "Fusion&QA")
