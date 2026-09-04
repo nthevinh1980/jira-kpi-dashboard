@@ -391,6 +391,13 @@ body{
   .bsc-period-card .kpis{grid-template-columns:repeat(2,1fr)}
 }
 
+
+.current-alert-audit{
+  margin:8px 0 10px;padding:8px 10px;border-radius:10px;
+  background:linear-gradient(90deg,#f4faf8,#f4f9fd);
+  border:1px solid #ddebe7;color:#587282;font-size:9px;font-weight:700;
+}
+
 </style>
 </head>
 <body>
@@ -529,12 +536,13 @@ body{
     <div class="section-heading">
       <div>
         <div class="card-title">Cảnh báo tới thời điểm hiện tại</div>
-        <div class="card-sub">Không lọc theo kỳ BSC · vẫn áp dụng bộ lọc Cán bộ / Epic / Loại công việc</div>
+        <div class="card-sub">Không lọc theo kỳ BSC · Quá hạn hiện tại = đã qua hết ngày Due và trạng thái Jira hiện tại chưa thuộc Done · vẫn áp dụng bộ lọc Cán bộ / Epic / Loại công việc</div>
       </div>
       <div class="section-badge danger" id="alertAsOf">Hiện tại</div>
     </div>
+    <div class="current-alert-audit" id="currentAlertAudit">Đang kiểm tra phạm vi cảnh báo...</div>
     <div class="attention-list">
-      <div class="alert-card a-red" data-kind="currentOverdue"><div class="alert-ico"><svg viewBox="0 0 24 24"><path d="M12 3 2.5 20h19L12 3Z"/><path d="M12 9v5M12 17h.01"/></svg></div><div><b id="aCurrentOverdue">0</b><p>Quá hạn chưa hoàn thành từ tất cả các kỳ</p><a href="#">Xem đúng danh sách Jira ↗</a></div></div>
+      <div class="alert-card a-red" data-kind="currentOverdue"><div class="alert-ico"><svg viewBox="0 0 24 24"><path d="M12 3 2.5 20h19L12 3Z"/><path d="M12 9v5M12 17h.01"/></svg></div><div><b id="aCurrentOverdue">0</b><p>Quá hạn đang mở (cộng dồn tất cả các kỳ)</p><a href="#">Xem đúng danh sách Jira ↗</a></div></div>
       <div class="alert-card a-amber" data-kind="soon"><div class="alert-ico"><svg viewBox="0 0 24 24"><path d="M12 4 3 20h18z"/></svg></div><div><b id="aSoon">0</b><p>Công việc sắp đến hạn (≤ 3 ngày)</p><a href="#">Xem đúng danh sách Jira ↗</a></div></div>
       <div class="alert-card a-violet" data-kind="veryComplex"><div class="alert-ico"><svg viewBox="0 0 24 24"><path d="M12 4 3 20h18z"/></svg></div><div><b id="aComplex">0</b><p>Công việc Very Complex có nguy cơ trễ</p><a href="#">Xem đúng danh sách Jira ↗</a></div></div>
       <div class="alert-card a-blue" data-kind="stale"><div class="alert-ico"><svg viewBox="0 0 24 24"><circle cx="11" cy="12" r="8"/><path d="M11 7v5l3 2"/><path d="m16.5 18.5 1.7 1.7 3-3.4"/></svg></div><div><b id="aStale">0</b><p>Cập nhật muộn theo Jira Label <strong>Muon</strong></p><a href="#">Xem đúng danh sách Jira ↗</a></div></div>
@@ -542,7 +550,7 @@ body{
   </div>
   <div class="card">
     <div class="card-title">Quy tắc theo dõi BSC đang áp dụng</div>
-    <div class="thresholds"><div class="threshold"><span>Kỳ BSC của Task</span><strong>Theo Due date</strong></div><div class="threshold"><span>Hết hạn trong ngày</span><strong>Sau 23:59:59</strong></div><div class="threshold"><span>Quá hạn</span><strong>DONE sau Due vẫn tính Quá hạn</strong></div><div class="threshold"><span>Cập nhật muộn</span><strong>Jira Label = Muon</strong></div><div class="threshold"><span>Cảnh báo hiện tại</span><strong>Không lọc theo kỳ</strong></div><div class="threshold"><span>Đối soát BSC theo kỳ</span><strong id="classCheck">0 / 0</strong></div></div>
+    <div class="thresholds"><div class="threshold"><span>Kỳ BSC của Task</span><strong>Theo Due date</strong></div><div class="threshold"><span>Hết hạn trong ngày</span><strong>Sau 23:59:59</strong></div><div class="threshold"><span>Quá hạn</span><strong>DONE sau Due vẫn tính Quá hạn</strong></div><div class="threshold"><span>Cập nhật muộn</span><strong>Jira Label = Muon</strong></div><div class="threshold"><span>Cảnh báo hiện tại</span><strong>Due đã qua + Status hiện tại ≠ Done</strong></div><div class="threshold"><span>Đối soát BSC theo kỳ</span><strong id="classCheck">0 / 0</strong></div></div>
   </div>
 </section>
 
@@ -687,28 +695,50 @@ function periodDisplayName(){
 // Trạng thái phục vụ CẢNH BÁO HIỆN TẠI:
 // không dùng mốc đóng sổ của tháng và không lọc theo kỳ BSC.
 function currentState(x){
- const now=new Date(),dueStart=d(x.due),dueDeadline=nextDayStart(dueStart),res=dt(x.resolutionAt||x.resolution);
- const statusDone=(String(x.statusCategory||"").toLowerCase()==="done")||["done","closed","resolved"].includes(String(x.status||"").toLowerCase());
+ const now=new Date(),dueStart=d(x.due),dueDeadline=nextDayStart(dueStart);
+ const statusCategory=String(x.statusCategory||"").trim().toLowerCase();
+ const statusName=String(x.status||"").trim().toLowerCase();
+
+ // V10.5 - CẢNH BÁO HIỆN TẠI:
+ // Phải nhìn trạng thái Jira HIỆN TẠI, không nhìn Resolution date lịch sử.
+ // Nếu Jira có statusCategory thì đây là nguồn chuẩn.
+ // Fallback status name chỉ dùng khi API không trả statusCategory.
+ const currentDone=statusCategory
+   ? statusCategory==="done"
+   : ["done","closed","resolved"].includes(statusName);
+
  const stale=hasMuonLabel(x);
- // Label Muon biểu thị trường hợp công việc đã được ghi nhận hoàn thành nhưng Jira cập nhật muộn.
- const currentDone=stale||!!res||statusDone;
+
+ // Due date có hiệu lực hết 23:59:59.
+ // Ví dụ Due 21/08 => bắt đầu quá hạn từ 22/08 00:00.
+ // Label Muon KHÔNG được phép làm một Task đang Open biến mất khỏi cảnh báo quá hạn hiện tại.
  const currentOverdue=!currentDone&&!!dueDeadline&&dueDeadline<=now;
+
  const todayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate());
  const daysToDue=dueStart?Math.floor((dueStart-todayStart)/86400000):9999;
  const currentSoon=!currentDone&&!!dueStart&&daysToDue>=0&&daysToDue<=3;
+
  let currentDaysLate=0;
  if(currentOverdue&&dueStart){
    const nowDay=new Date(now.getFullYear(),now.getMonth(),now.getDate());
    currentDaysLate=Math.max(1,Math.round((nowDay-dueStart)/86400000));
  }
+
  const currentVeryComplex=String(x.complexity||"")==="Very Complex"&&(currentOverdue||currentSoon);
  return {...x,currentDone,currentOverdue,currentSoon,currentDaysLate,currentVeryComplex,currentStale:stale};
 }
 function alertCalc(){
- const rows=DATA.filter(filtersOk).map(currentState); // CỐ Ý không DATA.filter(inPeriod)
+ // CỐ Ý KHÔNG dùng inPeriod(): cảnh báo là snapshot hiện tại của toàn bộ dữ liệu nguồn.
+ // Nếu bộ lọc Cán bộ = Tất cả thì đây là backlog hiện tại của toàn team qua mọi tháng/quý/năm.
+ const rows=DATA.filter(filtersOk).map(currentState);
+ const open=rows.filter(x=>!x.currentDone);
+ const withDue=open.filter(x=>!!d(x.due));
+ const overdue=withDue.filter(x=>x.currentOverdue);
  return {
    rows,
-   overdue:rows.filter(x=>x.currentOverdue),
+   open,
+   withDue,
+   overdue,
    soon:rows.filter(x=>x.currentSoon),
    veryComplex:rows.filter(x=>x.currentVeryComplex),
    stale:rows.filter(x=>x.currentStale)
@@ -812,6 +842,7 @@ function render(){
  $("#mStale").style.width=Math.min(100,pct(m.stale,m.total)).toFixed(1)+"%";
  $("#dTotal").textContent=delta(m.total,p.total);$("#dDone").textContent=delta(m.done,p.done);$("#dOntime").textContent=delta(m.on,p.on);$("#dOver").textContent=delta(m.over,p.over);$("#dDoing").textContent=delta(m.doing,p.doing);$("#dStale").textContent=delta(m.stale,p.stale);
  $("#aCurrentOverdue").textContent=alerts.overdue.length;$("#aSoon").textContent=alerts.soon.length;$("#aComplex").textContent=alerts.veryComplex.length;$("#aStale").textContent=alerts.stale.length;
+ $("#currentAlertAudit").textContent=`Phạm vi hiện tại: ${alerts.rows.length} Task nguồn · ${alerts.open.length} chưa hoàn thành · ${alerts.withDue.length} chưa hoàn thành có Due date · ${alerts.overdue.length} đã quá hạn`;
  const chk=$("#classCheck");if(chk){chk.textContent=`${m.classified} / ${m.total}`;chk.style.color=m.classified===m.total?"#11875d":"#d14343";}
  renderStaff(m);renderDonut(m);renderRank(m);renderTasks(m);renderRange()
 }
