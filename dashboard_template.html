@@ -88,6 +88,29 @@ a{color:inherit}
 .table-wrap{overflow:auto;border:1px solid #edf1f4;border-radius:10px;margin-top:9px}
 table{border-collapse:collapse;width:100%;font-size:9px}th{background:#f8fafc;color:#61798c;font-weight:900;text-align:right;padding:8px 6px;border-bottom:1px solid #e9eef2;white-space:nowrap}td{padding:8px 6px;border-bottom:1px solid #eff3f6;text-align:right;color:#314c62;white-space:nowrap}th:first-child,td:first-child{text-align:left}tbody tr:hover{background:#f9fcfd}#staffBody tr{cursor:pointer}
 .staff-link,.issue-link{color:#126fbd;text-decoration:none;font-weight:850}.score-pill,.pct-pill{display:inline-block;padding:3px 5px;border-radius:6px;font-weight:900}.p-good{background:#e8f8ef;color:#148052}.p-mid{background:#fff4df;color:#bb7614}.p-bad{background:#ffecef;color:#c3424e}
+.staff-performance-table{table-layout:fixed;min-width:880px!important}
+.staff-performance-table th,
+.staff-performance-table td{text-align:center!important;vertical-align:middle}
+.staff-performance-table th:nth-child(1),
+.staff-performance-table td:nth-child(1){width:44px}
+.staff-performance-table th:nth-child(2),
+.staff-performance-table td:nth-child(2){width:30%;text-align:left!important}
+.staff-performance-table th:nth-child(n+3),
+.staff-performance-table td:nth-child(n+3){width:auto}
+.staff-performance-table td:nth-child(2){white-space:normal}
+.staff-performance-table td:nth-child(2) .stat-jira{
+  white-space:normal;text-align:left;line-height:1.35;text-decoration:none;padding:3px 5px
+}
+.staff-kpi-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  min-width:72px;padding:4px 7px!important;text-decoration:none!important;
+  border:1px solid #e4ebf0!important;background:#fbfdfe!important;border-radius:8px!important
+}
+.staff-kpi-btn:hover{background:#f2f8fb!important;border-color:#cfe0e9!important}
+.staff-kpi-count{font-size:10px;font-weight:950;color:#176fbd}
+.staff-kpi-rate{font-size:8.5px;font-weight:900}
+.staff-total-btn{min-width:34px;text-decoration:none!important}
+
 
 .donut-wrap{display:flex;align-items:center;gap:18px;justify-content:center;margin-top:24px;min-height:185px}.donut{width:165px;height:165px;border-radius:50%;background:conic-gradient(#18a86f 0 72%,#f0aa26 72% 84%,#e45660 84% 90%,#2386d7 90%);position:relative}
 .donut:after{content:"";position:absolute;inset:31px;background:#fff;border-radius:50%}.donut-center{position:absolute;inset:0;display:grid;place-items:center;z-index:2;text-align:center}.donut-center strong{font-size:28px}.donut-center span{display:block;font-size:8px;color:#8ba0af}
@@ -563,7 +586,23 @@ body{
       </div>
       <div class="section-badge">Theo Due date</div>
     </div>
-    <div class="table-wrap staff-table-wrap"><table><thead><tr><th>#</th><th>Cán bộ</th><th>Tổng việc</th><th>Hoàn thành</th><<th>Quá hạn (%)</th><th>QH đã HT</th><th>QH chưa HT tại mốc</th><th>Sắp đến hạn</th><th>Cập nhật muộn</th></tr></thead><tbody id="staffBody"></tbody></table></div>
+    <div class="table-wrap staff-table-wrap">
+      <table class="staff-performance-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Cán bộ</th>
+            <th>Tổng việc</th>
+            <th>Hoàn thành</th>
+            <th>Đúng hạn</th>
+            <th>Quá hạn</th>
+            <th>Đang thực hiện</th>
+            <th>Cập nhật muộn</th>
+          </tr>
+        </thead>
+        <tbody id="staffBody"></tbody>
+      </table>
+    </div>
   </div>
   <div class="insights-grid">
     <div class="card insight-card">
@@ -857,31 +896,46 @@ function renderStaff(m){
    const total=a.length,
          done=a.filter(x=>x.done).length,
          on=a.filter(x=>x.ontime).length,
-         late=a.filter(x=>x.late).length,
-         overOpen=a.filter(x=>x.overdueOpen).length,
          over=a.filter(x=>x.overdue).length,
-         soon=a.filter(x=>x.soon).length,
+         doing=a.filter(x=>x.doing).length,
          stale=a.filter(x=>x.stale).length,
          completion=pct(done,total),
          onr=pct(on,total),
          overr=pct(over,total);
-   return {name,total,done,on,late,overOpen,onr,overr,over,soon,stale,completion};
- }).sort((a,b)=>b.onr-a.onr || a.over-b.over || a.name.localeCompare(b.name,"vi"));
+
+   return {name,total,done,on,over,doing,stale,completion,onr,overr};
+ }).sort((a,b)=>
+   b.completion-a.completion ||
+   b.onr-a.onr ||
+   a.over-b.over ||
+   a.name.localeCompare(b.name,"vi")
+ );
 
  const statButton=(value,staff,kind,extraClass="") =>
-   `<button class="stat-jira ${value===0?"zero":""} ${extraClass}" data-staff="${esc(staff)}" data-kind="${kind}" title="Mở ${value} Jira trên hệ thống">${value}</button>`;
+   `<button class="stat-jira staff-total-btn ${value===0?"zero":""} ${extraClass}"
+      data-staff="${esc(staff)}" data-kind="${kind}"
+      title="Mở ${value} Jira trên hệ thống">${value}</button>`;
+
+ const metricButton=(count,rate,staff,kind,rateClass) =>
+   `<button class="stat-jira staff-kpi-btn ${count===0?"zero":""}"
+      data-staff="${esc(staff)}" data-kind="${kind}"
+      title="Mở ${count} Jira trên hệ thống">
+      <span class="staff-kpi-count">${count}</span>
+      <span class="pct-pill staff-kpi-rate ${rateClass}">${rate.toFixed(1)}%</span>
+    </button>`;
 
  $("#staffBody").innerHTML=arr.map((x,i)=>`
    <tr>
      <td>${i+1}</td>
-     <td><button class="stat-jira" data-staff="${esc(x.name)}" data-kind="all" style="font-weight:900">${esc(x.name)}</button></td>
+     <td>
+       <button class="stat-jira" data-staff="${esc(x.name)}" data-kind="all"
+         style="font-weight:900">${esc(x.name)}</button>
+     </td>
      <td>${statButton(x.total,x.name,"all")}</td>
-     <td>${statButton(x.done,x.name,"done")}</td>
-     <td><button class="stat-jira ${x.on===0?"zero":""}" data-staff="${esc(x.name)}" data-kind="ontime"><span class="pct-pill ${scoreClass(x.onr)}">${x.onr.toFixed(1)}%</span></button></td>
-     <td><button class="stat-jira ${x.over===0?"zero":""}" data-staff="${esc(x.name)}" data-kind="overdue"><span class="pct-pill ${x.overr>20?"p-bad":x.overr>10?"p-mid":"p-good"}">${x.overr.toFixed(1)}%</span></button></td>
-     <td>${statButton(x.late,x.name,"late")}</td>
-     <td>${statButton(x.overOpen,x.name,"overdueOpen")}</td>
-     <td>${statButton(x.soon,x.name,"soon")}</td>
+     <td>${metricButton(x.done,x.completion,x.name,"done",scoreClass(x.completion))}</td>
+     <td>${metricButton(x.on,x.onr,x.name,"ontime",scoreClass(x.onr))}</td>
+     <td>${metricButton(x.over,x.overr,x.name,"overdue",x.overr>20?"p-bad":x.overr>10?"p-mid":"p-good")}</td>
+     <td>${statButton(x.doing,x.name,"doing")}</td>
      <td>${statButton(x.stale,x.name,"stale")}</td>
    </tr>
  `).join("");
@@ -890,13 +944,13 @@ function renderStaff(m){
    e.preventDefault();e.stopPropagation();
    const staffName=btn.dataset.staff,kind=btn.dataset.kind;
    let rows=m.rows.filter(x=>x.assignee===staffName);
+
    if(kind==="done") rows=rows.filter(x=>x.done);
    else if(kind==="ontime") rows=rows.filter(x=>x.ontime);
-   else if(kind==="late") rows=rows.filter(x=>x.late);
-   else if(kind==="overdueOpen") rows=rows.filter(x=>x.overdueOpen);
    else if(kind==="overdue") rows=rows.filter(x=>x.overdue);
-   else if(kind==="soon") rows=rows.filter(x=>x.soon);
+   else if(kind==="doing") rows=rows.filter(x=>x.doing);
    else if(kind==="stale") rows=rows.filter(x=>x.stale);
+
    openRowsInJira(rows);
  });
 }
