@@ -351,7 +351,6 @@ else:
         "alert_combined_count": len(alert_rows),
     }
 
-
 base_url = secret("JIRA_BASE_URL")
 email = secret("JIRA_EMAIL")
 token = secret("JIRA_API_TOKEN")
