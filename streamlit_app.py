@@ -236,11 +236,25 @@ def load_dashboard_data(
 
     # Nguồn 2: Cầu ở project khác.
     # JQL này nên là base query, không giới hạn tuần, để Dashboard tự lọc Tháng/Quý/Năm.
-    caunn_issues = []
-    if caunn_jql.strip():
-        caunn_issues = client.search_issues(
-            caunn_jql.strip(), fields, page_size=100, max_issues=10000
+caunn_issues = []
+
+if caunn_jql.strip():
+
+    caunn_all = client.search_issues(
+        caunn_jql.strip(),
+        fields,
+        page_size=100,
+        max_issues=10000
+    )
+
+    caunn_issues = [
+        issue
+        for issue in caunn_all
+        if value_matches(
+            (issue.get("fields") or {}).get(division_id),
+            division_value
         )
+    ]
 
     # Gộp 2 nguồn, loại trùng theo Issue Key.
     keyed: dict[str, tuple[dict[str, Any], str]] = {}
