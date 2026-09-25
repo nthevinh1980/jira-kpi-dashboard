@@ -258,11 +258,23 @@ def load_dashboard_data(
     # V10.6 — CẢNH BÁO HIỆN TẠI dùng một truy vấn Jira RIÊNG.
     # Lý do: nếu chỉ lấy DATA đã tải cho BSC rồi lọc bằng JavaScript,
     # các Task không có trong tập BSC nguồn sẽ không thể xuất hiện trong cảnh báo.
-    alert_main_issues = client.search_issues(
-        current_alert_jql.strip(),
-        fields,
-        page_size=100,
-        max_issues=10000,
+alert_main_all = client.search_issues(
+    current_alert_jql.strip(),
+    fields,
+    page_size=100,
+    max_issues=10000,
+)
+
+if strict_division_filter and division_id:
+    alert_main_issues = [
+        issue for issue in alert_main_all
+        if value_matches(
+            (issue.get("fields") or {}).get(division_id),
+            division_value
+        )
+    ]
+else:
+    alert_main_issues = alert_main_all
     ) if current_alert_jql.strip() else []
 
     alert_caunn_issues = client.search_issues(
