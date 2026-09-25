@@ -256,48 +256,78 @@ def load_dashboard_data(
     combined = list(keyed.values())
 
     # V10.6 — CẢNH BÁO HIỆN TẠI dùng một truy vấn Jira RIÊNG.
-    # Lý do: nếu chỉ lấy DATA đã tải cho BSC rồi lọc bằng JavaScript,
-    # các Task không có trong tập BSC nguồn sẽ không thể xuất hiện trong cảnh báo.
-alert_main_all = client.search_issues(
-    current_alert_jql.strip(),
-    fields,
-    page_size=100,
-    max_issues=10000,
-)
+    # Áp dụng lọc Division of Corebanking = Fusion&QA.
 
-if strict_division_filter and division_id:
-    alert_main_issues = [
-        issue for issue in alert_main_all
-        if value_matches(
-            (issue.get("fields") or {}).get(division_id),
-            division_value
+    alert_main_issues = []
+
+    if current_alert_jql.strip():
+        alert_main_all = client.search_issues(
+            current_alert_jql.strip(),
+            fields,
+            page_size=100,
+            max_issues=10000,
         )
-    ]
-else:
-    alert_main_issues = alert_main_all
 
-    alert_caunn_issues = client.search_issues(
-        caunn_current_alert_jql.strip(),
-        fields,
-        page_size=100,
-        max_issues=10000,
-    ) if caunn_current_alert_jql.strip() else []
+        if strict_division_filter and division_id:
+            alert_main_issues = [
+                issue for issue in alert_main_all
+                if value_matches(
+                    (issue.get("fields") or {}).get(division_id),
+                    division_value
+                )
+            ]
+        else:
+            alert_main_issues = list(alert_main_all)
+
+    alert_caunn_issues = []
+
+    if caunn_current_alert_jql.strip():
+        alert_caunn_all = client.search_issues(
+            caunn_current_alert_jql.strip(),
+            fields,
+            page_size=100,
+            max_issues=10000,
+        )
+
+        if strict_division_filter and division_id:
+            alert_caunn_issues = [
+                issue for issue in alert_caunn_all
+                if value_matches(
+                    (issue.get("fields") or {}).get(division_id),
+                    division_value
+                )
+            ]
+        else:
+            alert_caunn_issues = list(alert_caunn_all)
 
     alert_keyed: dict[str, tuple[dict[str, Any], str]] = {}
+
     for issue in alert_main_issues:
         key = str(issue.get("key") or "")
         if key:
             alert_keyed[key] = (issue, "FUSION_QA")
+
     for issue in alert_caunn_issues:
         key = str(issue.get("key") or "")
         if key:
             alert_keyed[key] = (issue, "CAUNN")
+
     alert_combined = list(alert_keyed.values())
 
     comment_map: dict[str, Any] = {}
+
     if sync_comments and combined:
-        keys = [str(issue.get("key") or "") for issue, _ in combined if issue.get("key")]
-        reviewer_account_id = secret("JIRA_LATE_UPDATE_REVIEWER_ACCOUNT_ID", "").strip()
+        keys = [
+            str(issue.get("key") or "")
+            for issue, _ in combined
+            if issue.get("key")
+        ]
+
+        reviewer_account_id = secret(
+            "JIRA_LATE_UPDATE_REVIEWER_ACCOUNT_ID",
+            ""
+        ).strip()
+
         comment_map = client.comments_audit_bulk(
             keys,
             late_update_marker=late_update_marker,
@@ -318,7 +348,6 @@ else:
         for issue, source in combined
     ]
 
-    # Alert rows không cần đọc comment vì rule cập nhật muộn dùng Jira Label = Muon.
     alert_rows = [
         build_row(
             issue,
@@ -350,6 +379,7 @@ else:
         "alert_caunn_count": len(alert_caunn_issues),
         "alert_combined_count": len(alert_rows),
     }
+
 
 base_url = secret("JIRA_BASE_URL")
 email = secret("JIRA_EMAIL")
