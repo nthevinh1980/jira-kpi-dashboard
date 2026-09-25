@@ -225,36 +225,29 @@ def load_dashboard_data(
     # Không được âm thầm loại Task chỉ vì Division bị trống/đổi sau này, vì sẽ làm sai BSC lịch sử.
     # Nếu thực sự cần khóa theo Division, bật JIRA_STRICT_DIVISION_FILTER=true trong Secrets.
     main_all = client.search_issues(main_jql, fields, page_size=100, max_issues=10000)
-    strict_division_filter = secret("JIRA_STRICT_DIVISION_FILTER", "false").strip().lower() in {"1", "true", "yes", "y"}
-    if strict_division_filter and division_id:
-        main_issues = [
-            issue for issue in main_all
-            if value_matches((issue.get("fields") or {}).get(division_id), division_value)
-        ]
-    else:
-        main_issues = list(main_all)
+
+    # HARD FILTER: chỉ lấy Division of Corebanking = Fusion&QA
+    # Không phụ thuộc Secrets bật/tắt để tránh lọt người ngoài nhóm.
+    strict_division_filter = True
+    if not division_id:
+        raise JiraApiError("Không tìm thấy field Division of Corebanking. Không thể lọc Fusion&QA.")
+
+    main_issues = [
+        issue for issue in main_all
+        if value_matches((issue.get("fields") or {}).get(division_id), division_value)
+    ]
 
     # Nguồn 2: Cầu ở project khác.
     # JQL này nên là base query, không giới hạn tuần, để Dashboard tự lọc Tháng/Quý/Năm.
-caunn_issues = []
-
-if caunn_jql.strip():
-
-    caunn_all = client.search_issues(
-        caunn_jql.strip(),
-        fields,
-        page_size=100,
-        max_issues=10000
-    )
-
-    caunn_issues = [
-        issue
-        for issue in caunn_all
-        if value_matches(
-            (issue.get("fields") or {}).get(division_id),
-            division_value
+    caunn_issues = []
+    if caunn_jql.strip():
+        caunn_all = client.search_issues(
+            caunn_jql.strip(), fields, page_size=100, max_issues=10000
         )
-    ]
+        caunn_issues = [
+            issue for issue in caunn_all
+            if value_matches((issue.get("fields") or {}).get(division_id), division_value)
+        ]
 
     # Gộp 2 nguồn, loại trùng theo Issue Key.
     keyed: dict[str, tuple[dict[str, Any], str]] = {}
@@ -270,10 +263,9 @@ if caunn_jql.strip():
     combined = list(keyed.values())
 
     # V10.6 — CẢNH BÁO HIỆN TẠI dùng một truy vấn Jira RIÊNG.
-    # Áp dụng lọc Division of Corebanking = Fusion&QA.
-
-    alert_main_issues = []
-
+    # Lý do: nếu chỉ lấy DATA đã tải cho BSC rồi lọc bằng JavaScript,
+    # các Task không có trong tập BSC nguồn sẽ không thể xuất hiện trong cảnh báo.
+    alert_main_all = []
     if current_alert_jql.strip():
         alert_main_all = client.search_issues(
             current_alert_jql.strip(),
@@ -282,19 +274,12 @@ if caunn_jql.strip():
             max_issues=10000,
         )
 
-        if strict_division_filter and division_id:
-            alert_main_issues = [
-                issue for issue in alert_main_all
-                if value_matches(
-                    (issue.get("fields") or {}).get(division_id),
-                    division_value
-                )
-            ]
-        else:
-            alert_main_issues = list(alert_main_all)
+    alert_main_issues = [
+        issue for issue in alert_main_all
+        if value_matches((issue.get("fields") or {}).get(division_id), division_value)
+    ]
 
-    alert_caunn_issues = []
-
+    alert_caunn_all = []
     if caunn_current_alert_jql.strip():
         alert_caunn_all = client.search_issues(
             caunn_current_alert_jql.strip(),
@@ -303,45 +288,26 @@ if caunn_jql.strip():
             max_issues=10000,
         )
 
-        if strict_division_filter and division_id:
-            alert_caunn_issues = [
-                issue for issue in alert_caunn_all
-                if value_matches(
-                    (issue.get("fields") or {}).get(division_id),
-                    division_value
-                )
-            ]
-        else:
-            alert_caunn_issues = list(alert_caunn_all)
+    alert_caunn_issues = [
+        issue for issue in alert_caunn_all
+        if value_matches((issue.get("fields") or {}).get(division_id), division_value)
+    ]
 
     alert_keyed: dict[str, tuple[dict[str, Any], str]] = {}
-
     for issue in alert_main_issues:
         key = str(issue.get("key") or "")
         if key:
             alert_keyed[key] = (issue, "FUSION_QA")
-
     for issue in alert_caunn_issues:
         key = str(issue.get("key") or "")
         if key:
             alert_keyed[key] = (issue, "CAUNN")
-
     alert_combined = list(alert_keyed.values())
 
     comment_map: dict[str, Any] = {}
-
     if sync_comments and combined:
-        keys = [
-            str(issue.get("key") or "")
-            for issue, _ in combined
-            if issue.get("key")
-        ]
-
-        reviewer_account_id = secret(
-            "JIRA_LATE_UPDATE_REVIEWER_ACCOUNT_ID",
-            ""
-        ).strip()
-
+        keys = [str(issue.get("key") or "") for issue, _ in combined if issue.get("key")]
+        reviewer_account_id = secret("JIRA_LATE_UPDATE_REVIEWER_ACCOUNT_ID", "").strip()
         comment_map = client.comments_audit_bulk(
             keys,
             late_update_marker=late_update_marker,
@@ -362,6 +328,7 @@ if caunn_jql.strip():
         for issue, source in combined
     ]
 
+    # Alert rows không cần đọc comment vì rule cập nhật muộn dùng Jira Label = Muon.
     alert_rows = [
         build_row(
             issue,
@@ -386,6 +353,7 @@ if caunn_jql.strip():
         "main_before_division": len(main_all),
         "main_after_division": len(main_issues),
         "strict_division_filter": strict_division_filter,
+        "removed_by_division": len(main_all) - len(main_issues),
         "caunn_count": len(caunn_issues),
         "combined_count": len(rows),
         "alert_rows": alert_rows,
