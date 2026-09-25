@@ -275,7 +275,6 @@ if strict_division_filter and division_id:
     ]
 else:
     alert_main_issues = alert_main_all
-    ) if current_alert_jql.strip() else []
 
     alert_caunn_issues = client.search_issues(
         caunn_current_alert_jql.strip(),
