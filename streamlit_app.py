@@ -226,16 +226,13 @@ def load_dashboard_data(
     # Nếu thực sự cần khóa theo Division, bật JIRA_STRICT_DIVISION_FILTER=true trong Secrets.
     main_all = client.search_issues(main_jql, fields, page_size=100, max_issues=10000)
     strict_division_filter = secret("JIRA_STRICT_DIVISION_FILTER", "false").strip().lower() in {"1", "true", "yes", "y"}
-    if division_id:
-    main_issues = [
-        issue for issue in main_all
-        if value_matches(
-            (issue.get("fields") or {}).get(division_id),
-            "Fusion&QA"
-        )
-    ]
-else:
-    main_issues = list(main_all)
+    if strict_division_filter and division_id:
+        main_issues = [
+            issue for issue in main_all
+            if value_matches((issue.get("fields") or {}).get(division_id), division_value)
+        ]
+    else:
+        main_issues = list(main_all)
 
     # Nguồn 2: Cầu ở project khác.
     # JQL này nên là base query, không giới hạn tuần, để Dashboard tự lọc Tháng/Quý/Năm.
