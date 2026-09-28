@@ -537,6 +537,33 @@ body{
     text-decoration:none;
     font-family:Inter,Segoe UI,Arial,sans-serif;
 }
+  .complexity-link{
+
+    border:0;
+    background:none;
+    color:#176fbd;
+    font-weight:900;
+    cursor:pointer;
+    font-size:inherit;
+    padding:2px 5px;
+    border-radius:5px;
+
+}
+
+
+.complexity-link:hover{
+
+    background:#eaf4ff;
+    color:#075b9e;
+
+}
+
+
+.complexity-link.total{
+
+    color:#20384d;
+
+}
 </style>
 </head>
 <body>
@@ -1130,31 +1157,71 @@ function renderComplexity(m){
 
 
 
-    html+=`
+html+=`
 
-    <tr>
+<tr>
 
-      <td>
-        ${esc(name)}
-      </td>
+<td>
+${esc(name)}
+</td>
 
-      <td>${v["Complex"]}</td>
 
-      <td>${v["Medium"]}</td>
+<td>
+<button class="complexity-link"
+data-staff="${esc(name)}"
+data-complexity="Complex">
+${v["Complex"]}
+</button>
+</td>
 
-      <td>${v["Simple"]}</td>
 
-      <td>${v["Very Complex"]}</td>
+<td>
+<button class="complexity-link"
+data-staff="${esc(name)}"
+data-complexity="Medium">
+${v["Medium"]}
+</button>
+</td>
 
-      <td>${v["Very Simple"]}</td>
 
-      <td>
-        <b>${sum}</b>
-      </td>
+<td>
+<button class="complexity-link"
+data-staff="${esc(name)}"
+data-complexity="Simple">
+${v["Simple"]}
+</button>
+</td>
 
-    </tr>
 
-    `;
+<td>
+<button class="complexity-link"
+data-staff="${esc(name)}"
+data-complexity="Very Complex">
+${v["Very Complex"]}
+</button>
+</td>
+
+
+<td>
+<button class="complexity-link"
+data-staff="${esc(name)}"
+data-complexity="Very Simple">
+${v["Very Simple"]}
+</button>
+</td>
+
+
+<td>
+<button class="complexity-link total"
+data-staff="${esc(name)}"
+data-complexity="ALL">
+<b>${sum}</b>
+</button>
+</td>
+
+
+</tr>
+`;
 
 
   });
@@ -1170,33 +1237,128 @@ function renderComplexity(m){
 
 
 
-  html+=`
+html+=`
 
-  <tr style="background:#f3f7fa;font-weight:900">
+<tr 
+style="background:#f3f7fa;font-weight:900"
+class="complexity-total-row">
 
-    <td>
-      Total Unique Issues:
-    </td>
+<td>
+Total Unique Issues:
+</td>
 
-    <td>${total["Complex"]}</td>
 
-    <td>${total["Medium"]}</td>
+<td>
+<button class="complexity-link total-all"
+data-complexity="Complex">
+${total["Complex"]}
+</button>
+</td>
 
-    <td>${total["Simple"]}</td>
 
-    <td>${total["Very Complex"]}</td>
+<td>
+<button class="complexity-link total-all"
+data-complexity="Medium">
+${total["Medium"]}
+</button>
+</td>
 
-    <td>${total["Very Simple"]}</td>
 
-    <td>${grand}</td>
+<td>
+<button class="complexity-link total-all"
+data-complexity="Simple">
+${total["Simple"]}
+</button>
+</td>
 
-  </tr>
 
-  `;
+<td>
+<button class="complexity-link total-all"
+data-complexity="Very Complex">
+${total["Very Complex"]}
+</button>
+</td>
+
+
+<td>
+<button class="complexity-link total-all"
+data-complexity="Very Simple">
+${total["Very Simple"]}
+</button>
+</td>
+
+
+<td>
+<button class="complexity-link total-all total"
+data-complexity="ALL">
+${grand}
+</button>
+</td>
+
+
+</tr>
+
+`;
 
 
 
   $("#complexityBody").innerHTML=html;
+  $$(".complexity-link").forEach(btn=>{
+  $$(".complexity-link.total-all").forEach(btn=>{
+
+    btn.onclick=()=>{
+
+        const complexity=btn.dataset.complexity;
+
+        let rows=calc().rows;
+
+
+        if(complexity!=="ALL"){
+
+            rows=rows.filter(
+                x=>x.complexity===complexity
+            );
+
+        }
+
+
+        openRowsInJira(rows);
+
+    };
+
+});
+
+    btn.onclick=()=>{
+
+
+        const staff=btn.dataset.staff;
+        const complexity=btn.dataset.complexity;
+
+
+        const mm=calc();
+
+
+        let rows=mm.rows.filter(
+            x=>x.assignee===staff
+        );
+
+
+        if(complexity!=="ALL"){
+
+            rows=rows.filter(
+                x=>x.complexity===complexity
+            );
+
+        }
+
+
+        openRowsInJira(rows);
+
+
+    };
+
+
+});
 
 }
 function renderStaff(m){
