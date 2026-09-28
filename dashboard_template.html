@@ -420,7 +420,52 @@ body{
   background:linear-gradient(90deg,#f4faf8,#f4f9fd);
   border:1px solid #ddebe7;color:#587282;font-size:9px;font-weight:700;
 }
+/* ===== Complexity Report Table ===== */
 
+.complexity-table{
+    width:100%;
+    border-collapse:collapse;
+    table-layout:auto;
+    font-size:11px;
+}
+
+
+.complexity-table th{
+    background:#f6f9fb;
+    color:#526f83;
+    font-weight:900;
+    padding:10px 8px;
+    text-align:center;
+    white-space:nowrap;
+}
+
+
+.complexity-table td{
+    padding:10px 8px;
+    border-bottom:1px solid #e8eef2;
+    text-align:center;
+    color:#314c62;
+    white-space:nowrap;
+}
+
+
+.complexity-table th:first-child,
+.complexity-table td:first-child{
+    text-align:left;
+    min-width:260px;
+    font-weight:700;
+}
+
+
+.complexity-table tbody tr:hover{
+    background:#f8fbfc;
+}
+
+
+#complexityBody td:first-child{
+    font-size:12px;
+    color:#20384d;
+}
 </style>
 </head>
 <body>
@@ -598,7 +643,7 @@ body{
 
   <div class="table-wrap">
 
-    <table class="staff-performance-table">
+    <table class="complexity-table">
 
       <thead>
         <tr>
