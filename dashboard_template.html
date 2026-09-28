@@ -466,8 +466,8 @@ body{
     font-size:12px;
     color:#20384d;
 }
-</style>
-  /* ===== Đồng bộ bảng Hiệu suất cán bộ giống bảng Complexity ===== */
+
+/* ===== Đồng bộ bảng Hiệu suất cán bộ giống bảng Complexity ===== */
 
 .staff-performance-table{
     width:100%;
@@ -475,7 +475,10 @@ body{
     table-layout:auto;
     font-size:11px;
 }
-
+.staff-performance-table .staff-kpi-rate{
+    font-size:10px;
+    font-weight:900;
+}
 
 .staff-performance-table th{
     background:#f6f9fb;
@@ -498,7 +501,6 @@ body{
 }
 
 
-/* Cột tên cán bộ */
 .staff-performance-table th:nth-child(2),
 .staff-performance-table td:nth-child(2){
 
@@ -510,24 +512,28 @@ body{
 }
 
 
-/* Hover giống bảng Complexity */
 .staff-performance-table tbody tr:hover{
     background:#f8fbfc;
 }
 
 
-/* Các số KPI */
 .staff-performance-table .staff-kpi-count{
     color:#176fbd;
     font-weight:900;
 }
 
 
-/* Phần trăm */
 .staff-performance-table .staff-kpi-rate{
     font-size:10px;
     font-weight:900;
 }
+  .staff-performance-table .stat-jira{
+    font-size:12px;
+    color:#20384d;
+    font-weight:800;
+    text-decoration:none;
+}
+</style>
 </head>
 <body>
 <div class="shell">
@@ -1229,8 +1235,11 @@ function renderStaff(m){
    <tr>
      <td>${i+1}</td>
      <td>
-       <button class="stat-jira" data-staff="${esc(x.name)}" data-kind="all"
-         style="font-weight:900">${esc(x.name)}</button>
+       <button class="stat-jira"
+  data-staff="${esc(x.name)}"
+  data-kind="all">
+  ${esc(x.name)}
+</button>
      </td>
      <td>${statButton(x.total,x.name,"all")}</td>
      <td>${metricButton(x.done,x.completion,x.name,"done",scoreClass(x.completion))}</td>
