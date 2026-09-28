@@ -149,7 +149,6 @@ def build_row(
         "assignee": str(assignee.get("displayName") or "(Chưa phân công)"),
         "assigneeAccountId": str(assignee.get("accountId") or ""),
         "team": "Fusion&QA" if source == "FUSION_QA" else "Cầu",
-        ),
         "source": source,
         "division": as_text(f.get(division_id)) if division_id else "",
         "complexity": complexity,
