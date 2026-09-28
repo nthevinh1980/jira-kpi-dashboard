@@ -576,7 +576,52 @@ body{
     <div class="thresholds"><div class="threshold"><span>Kỳ BSC của Task</span><strong>Theo Due date</strong></div><div class="threshold"><span>Hết hạn trong ngày</span><strong>Sau 23:59:59</strong></div><div class="threshold"><span>Quá hạn</span><strong>DONE sau Due vẫn tính Quá hạn</strong></div><div class="threshold"><span>Cập nhật muộn</span><strong>Jira Label = Muon</strong></div><div class="threshold"><span>Cảnh báo hiện tại</span><strong>Due đã qua + Status hiện tại ≠ Done</strong></div><div class="threshold"><span>Đối soát BSC theo kỳ</span><strong id="classCheck">0 / 0</strong></div></div>
   </div>
 </section>
+<section class="card" id="complexitySec">
 
+  <div class="section-heading">
+    <div>
+      <div class="card-title">
+        B2 - [THỰC HIỆN] KẾT QUẢ THEO ĐỘ KHÓ TASK
+      </div>
+
+      <div class="card-sub">
+        Phân bổ công việc theo mức độ Complexity trên Jira
+      </div>
+    </div>
+
+    <div class="section-badge">
+      Theo Complexity
+    </div>
+
+  </div>
+
+
+  <div class="table-wrap">
+
+    <table class="staff-performance-table">
+
+      <thead>
+        <tr>
+          <th>Cán bộ</th>
+          <th>Complex</th>
+          <th>Medium</th>
+          <th>Simple</th>
+          <th>Very Complex</th>
+          <th>Very Simple</th>
+          <th>T.</th>
+        </tr>
+      </thead>
+
+
+      <tbody id="complexityBody"></tbody>
+
+
+    </table>
+
+  </div>
+
+</section>
+  
 <section class="performance" id="staffSec">
   <div class="card staff-performance-card">
     <div class="section-heading">
@@ -885,9 +930,159 @@ function render(){
  $("#aCurrentOverdue").textContent=alerts.overdue.length;$("#aSoon").textContent=alerts.soon.length;$("#aComplex").textContent=alerts.veryComplex.length;$("#aStale").textContent=alerts.stale.length;
  $("#currentAlertAudit").textContent=`Nguồn cảnh báo trực tiếp từ Jira: ${alerts.rows.length} Task đang chưa Done · ${alerts.withDue.length} có Due date · ${alerts.overdue.length} đã quá hạn`;
  const chk=$("#classCheck");if(chk){chk.textContent=`${m.classified} / ${m.total}`;chk.style.color=m.classified===m.total?"#11875d":"#d14343";}
- renderStaff(m);renderDonut(m);renderRank(m);renderTasks(m);renderRange()
+ renderStaff(m);
+renderComplexity(m);
+renderDonut(m);
+renderRank(m);
+renderTasks(m);
+renderRange()
 }
 function renderRange(){const [s,e]=bounds();$("#rangeText").textContent=`${s.toLocaleDateString("vi-VN")} - ${e.toLocaleDateString("vi-VN")}`}
+function renderComplexity(m){
+
+  const map={};
+
+
+  m.rows.forEach(x=>{
+
+    const name=x.assignee || "(Chưa phân công)";
+
+
+    if(!map[name]){
+
+      map[name]={
+        "Complex":0,
+        "Medium":0,
+        "Simple":0,
+        "Very Complex":0,
+        "Very Simple":0
+      };
+
+    }
+
+
+    const c=x.complexity || "Simple";
+
+
+    if(map[name][c]!==undefined){
+        map[name][c]++;
+    }
+
+
+  });
+
+
+
+  let total={
+    "Complex":0,
+    "Medium":0,
+    "Simple":0,
+    "Very Complex":0,
+    "Very Simple":0
+  };
+
+
+  let html="";
+
+
+  Object.entries(map)
+
+  .sort((a,b)=>{
+
+    const totalA=Object.values(a[1]).reduce((s,v)=>s+v,0);
+    const totalB=Object.values(b[1]).reduce((s,v)=>s+v,0);
+
+    return totalB-totalA;
+
+  })
+
+
+  .forEach(([name,v])=>{
+
+
+    const sum=
+      v["Complex"]+
+      v["Medium"]+
+      v["Simple"]+
+      v["Very Complex"]+
+      v["Very Simple"];
+
+
+    Object.keys(total).forEach(k=>{
+        total[k]+=v[k];
+    });
+
+
+
+    html+=`
+
+    <tr>
+
+      <td>
+        ${esc(name)}
+      </td>
+
+      <td>${v["Complex"]}</td>
+
+      <td>${v["Medium"]}</td>
+
+      <td>${v["Simple"]}</td>
+
+      <td>${v["Very Complex"]}</td>
+
+      <td>${v["Very Simple"]}</td>
+
+      <td>
+        <b>${sum}</b>
+      </td>
+
+    </tr>
+
+    `;
+
+
+  });
+
+
+
+  const grand=
+    total["Complex"]+
+    total["Medium"]+
+    total["Simple"]+
+    total["Very Complex"]+
+    total["Very Simple"];
+
+
+
+  html+=`
+
+  <tr style="background:#f3f7fa;font-weight:900">
+
+    <td>
+      Total Unique Issues:
+    </td>
+
+    <td>${total["Complex"]}</td>
+
+    <td>${total["Medium"]}</td>
+
+    <td>${total["Simple"]}</td>
+
+    <td>${total["Very Complex"]}</td>
+
+    <td>${total["Very Simple"]}</td>
+
+    <td>${grand}</td>
+
+  </tr>
+
+  `;
+
+
+
+  $("#complexityBody").innerHTML=html;
+
+}
 function renderStaff(m){
  const map={};
  m.rows.forEach(x=>(map[x.assignee]??=[]).push(x));
