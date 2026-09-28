@@ -148,7 +148,11 @@ def build_row(
         "summary": str(f.get("summary") or ""),
         "assignee": str(assignee.get("displayName") or "(Chưa phân công)"),
         "assigneeAccountId": str(assignee.get("accountId") or ""),
-        "team": "Fusion&QA" if source == "FUSION_QA" else "External assignment",
+        "team": (
+    "Fusion&QA"
+    if source == "FUSION_QA"
+    else "Cầu"
+),
         "source": source,
         "division": as_text(f.get(division_id)) if division_id else "",
         "complexity": complexity,
@@ -237,17 +241,24 @@ def load_dashboard_data(
         if value_matches((issue.get("fields") or {}).get(division_id), division_value)
     ]
 
-    # Nguồn 2: Cầu ở project khác.
-    # JQL này nên là base query, không giới hạn tuần, để Dashboard tự lọc Tháng/Quý/Năm.
-    caunn_issues = []
-    if caunn_jql.strip():
-        caunn_all = client.search_issues(
-            caunn_jql.strip(), fields, page_size=100, max_issues=10000
-        )
-        caunn_issues = [
-            issue for issue in caunn_all
-            if value_matches((issue.get("fields") or {}).get(division_id), division_value)
-        ]
+# ==================================================
+# NGUỒN 2: CẦU
+# Project độc lập nên KHÔNG lọc Division Fusion&QA
+# ==================================================
+
+caunn_issues = []
+
+if caunn_jql.strip():
+
+    caunn_all = client.search_issues(
+        caunn_jql.strip(),
+        fields,
+        page_size=100,
+        max_issues=10000
+    )
+
+    # Lấy trực tiếp dữ liệu Jira trả về
+    caunn_issues = caunn_all
 
     # Gộp 2 nguồn, loại trùng theo Issue Key.
     keyed: dict[str, tuple[dict[str, Any], str]] = {}
@@ -288,10 +299,13 @@ def load_dashboard_data(
             max_issues=10000,
         )
 
-    alert_caunn_issues = [
-        issue for issue in alert_caunn_all
-        if value_matches((issue.get("fields") or {}).get(division_id), division_value)
-    ]
+# ==========================================
+# ALERT CẦU
+# Không phụ thuộc Division
+# ==========================================
+
+    alert_caunn_issues = alert_caunn_all
+
 
     alert_keyed: dict[str, tuple[dict[str, Any], str]] = {}
     for issue in alert_main_issues:
