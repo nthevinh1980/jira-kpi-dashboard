@@ -391,8 +391,9 @@ caunn_jql = secret(
     "JIRA_CAUNN_JQL",
     'project = "2024.PS006_Xây dựng ứng dụng tác nghiệp tập trung tại quầy" '
     'AND assignee = 712020:c282b441-9290-4c08-bc66-d834b94e17a7 '
-    'AND issuetype = Sub-task '
-    'ORDER BY duedate ASC'
+    'AND issuetype IN (Sub-task) '
+    'AND parentEpic = PS0062024-25188 '
+    'ORDER BY resolved DESC'
 )
 caunn_default_weight = int(secret("JIRA_CAUNN_DEFAULT_WEIGHT", "1") or "1")
 
@@ -404,7 +405,8 @@ caunn_current_alert_jql = secret(
     "JIRA_CAUNN_CURRENT_ALERT_JQL",
     'project = "2024.PS006_Xây dựng ứng dụng tác nghiệp tập trung tại quầy" '
     'AND assignee = 712020:c282b441-9290-4c08-bc66-d834b94e17a7 '
-    'AND issuetype = Sub-task '
+    'AND issuetype IN (Sub-task) '
+    'AND parentEpic = PS0062024-25188 '
     'AND statusCategory != Done '
     'ORDER BY duedate ASC'
 )
