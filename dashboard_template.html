@@ -1576,7 +1576,153 @@ $$(".legend .leg").forEach(el=>el.onclick=()=>{
 
 $$(".nav-btn").forEach(x=>x.classList.toggle("active",x===b));document.getElementById(b.dataset.target).scrollIntoView({behavior:"smooth"})})
 $("#refreshBtn").onclick=()=>{detailPage=1;render();$("#syncTime").textContent=new Date().toLocaleString("vi-VN");toast("Đã làm mới dữ liệu giao diện demo")}
-$("#exportBtn").onclick=()=>toast("Bản thật sẽ xuất CSV/XLSX/PDF theo bộ lọc đang chọn.")
+// ============================================================
+// XUẤT BÁO CÁO HTML - SNAPSHOT ĐÚNG MÀN HÌNH ĐANG MỞ
+// ============================================================
+function exportCurrentReportHtml(){
+
+  // 1. Clone toàn bộ giao diện hiện tại.
+  // Không sửa trực tiếp màn hình đang chạy.
+  const clone = document.documentElement.cloneNode(true);
+
+  // 2. Lưu đúng giá trị các dropdown/input hiện đang được chọn.
+  const srcControls = document.querySelectorAll("select, input, textarea");
+  const dstControls = clone.querySelectorAll("select, input, textarea");
+
+  srcControls.forEach((src, i) => {
+    const dst = dstControls[i];
+    if(!dst) return;
+
+    if(src.tagName === "SELECT"){
+      [...dst.options].forEach(opt => {
+        opt.removeAttribute("selected");
+        if(opt.value === src.value){
+          opt.setAttribute("selected", "selected");
+        }
+      });
+    }
+
+    else if(src.type === "checkbox" || src.type === "radio"){
+      if(src.checked){
+        dst.setAttribute("checked", "checked");
+      }else{
+        dst.removeAttribute("checked");
+      }
+    }
+
+    else{
+      dst.setAttribute("value", src.value || "");
+      if(dst.tagName === "TEXTAREA"){
+        dst.textContent = src.value || "";
+      }
+    }
+  });
+
+  // 3. Xóa JavaScript trong file xuất.
+  // File HTML sau khi tải xuống sẽ là báo cáo tĩnh,
+  // không tự chạy lại và không thay đổi số liệu.
+  clone.querySelectorAll("script").forEach(el => el.remove());
+
+  // 4. Xóa nút Xuất báo cáo khỏi bản HTML đã xuất.
+  const exportButton = clone.querySelector("#exportBtn");
+  if(exportButton) exportButton.remove();
+
+  // Có thể bỏ nút Làm mới trong báo cáo tĩnh.
+  const refreshButton = clone.querySelector("#refreshBtn");
+  if(refreshButton) refreshButton.remove();
+
+  // 5. Thêm thông tin cho biết đây là bản báo cáo đã xuất.
+  const head = clone.querySelector("head");
+
+  if(head){
+    const exportStyle = document.createElement("style");
+
+    exportStyle.textContent = `
+      @media print {
+        .sidebar {
+          display: none !important;
+        }
+
+        .main {
+          margin-left: 0 !important;
+          width: 100% !important;
+        }
+
+        body {
+          background: #fff !important;
+        }
+
+        .card {
+          break-inside: avoid;
+        }
+      }
+    `;
+
+    head.appendChild(exportStyle);
+  }
+
+  // 6. Sinh tên file dựa trên bộ lọc hiện tại.
+  const cycle =
+    document.querySelector("#cycle")?.value || "Bao-cao";
+
+  const period =
+    document.querySelector("#period")?.value || "";
+
+  const assignee =
+    document.querySelector("#assignee")?.value || "Tat-ca-can-bo";
+
+  const safeName = text =>
+    String(text || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D")
+      .replace(/[^a-zA-Z0-9_-]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+
+  const now = new Date();
+
+  const stamp =
+    now.getFullYear() +
+    String(now.getMonth()+1).padStart(2,"0") +
+    String(now.getDate()).padStart(2,"0") +
+    "_" +
+    String(now.getHours()).padStart(2,"0") +
+    String(now.getMinutes()).padStart(2,"0");
+
+  const fileName =
+    `Jira_BSC_${safeName(cycle)}_${safeName(period)}_${safeName(assignee)}_${stamp}.html`;
+
+  // 7. Tạo file HTML.
+  const html =
+    "<!doctype html>\n" +
+    clone.outerHTML;
+
+  const blob = new Blob(
+    [html],
+    {type:"text/html;charset=utf-8"}
+  );
+
+  const url = URL.createObjectURL(blob);
+
+  // 8. Tải file xuống máy.
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+  // 9. Thông báo.
+  toast("Đã xuất báo cáo HTML theo đúng bộ lọc đang mở.");
+}
+
+
+// Gắn chức năng cho nút Xuất báo cáo.
+$("#exportBtn").onclick = exportCurrentReportHtml;
 $("#cycle").onchange=()=>{detailPage=1;fillPeriods();render()}
 ["#period","#assignee","#epic","#issueType"].forEach(id=>$(id).onchange=()=>{detailPage=1;render()})
 
